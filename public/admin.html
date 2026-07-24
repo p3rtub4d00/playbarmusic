@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f172a">
-    <title>Painel Administrativo | PlayBar</title>[cite: 2]
+    <title>Painel Administrativo | PlayBar</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/images/logo.png">
@@ -34,7 +34,7 @@
     <!-- AVISO DE BLOQUEIO NO PAINEL ADMIN COM PIX -->
     <div id="adminBlockOverlay">
         <h1>🔒 Sistema Suspenso por Inadimplência</h1>
-        <p>Sua licença com o QG Mestre expirou[cite: 2]. Escaneie o QR Code PIX abaixo para regularizar e liberar o painel instantaneamente:</p>
+        <p>Sua licença com o QG Mestre expirou. Escaneie o QR Code PIX abaixo para regularizar e liberar o painel instantaneamente:</p>
         
         <div id="adminPixContainer" style="background: white; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
             <span style="color: #334155; font-size: 0.85rem;">Carregando PIX...</span>
@@ -277,7 +277,7 @@
     
     <script>
         const MASTER_QG_URL = "https://admplaybar.onrender.com";
-        const CLIENT_ID = "playbarteste"; // Altere para o ID exato deste bar cadastrado no Master QG
+        const CLIENT_ID = "playbarteste"; // ID exato cadastrado no Master QG
         let pixCarregadoAdmin = false;
 
         async function checkAdminLicense() {
@@ -285,6 +285,7 @@
                 const res = await fetch(`${MASTER_QG_URL}/api/check-license?client_id=${CLIENT_ID}`);
                 const data = await res.json();
                 const overlay = document.getElementById('adminBlockOverlay');
+                
                 if (data.ok && data.active === false) {
                     overlay.style.display = 'flex';
                     if (!pixCarregadoAdmin) {
@@ -296,7 +297,7 @@
                     pixCarregadoAdmin = false;
                 }
             } catch (error) {
-                console.error("Erro ao validar licença no painel admin[cite: 2]:", error);
+                console.error("Erro ao validar licença no painel admin:", error);
             }
         }
 
