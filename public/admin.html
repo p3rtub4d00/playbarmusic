@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+[source: 8]<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -25,26 +25,16 @@
             justify-content: center; align-items: center; z-index: 99999;
             text-align: center; padding: 20px; color: #fff;
         }
-        #adminBlockOverlay h1 { font-size: 2.2rem; color: #ef4444; margin-bottom: 10px; }
-        #adminBlockOverlay p { font-size: 1rem; color: #94a3b8; max-width: 500px; line-height: 1.5; margin-bottom: 15px; }
+        #adminBlockOverlay h1 { font-size: 2.5rem; color: #ef4444; margin-bottom: 15px; }
+        #adminBlockOverlay p { font-size: 1.1rem; color: #94a3b8; max-width: 500px; line-height: 1.5; }
     </style>
 </head>
 <body>
     
-    <!-- AVISO DE BLOQUEIO NO PAINEL ADMIN COM PIX -->
+    <!-- AVISO DE BLOQUEIO NO PAINEL ADMIN -->
     <div id="adminBlockOverlay">
         <h1>🔒 Sistema Suspenso por Inadimplência</h1>
-        <p>Sua licença com o QG Mestre expirou. Escaneie o QR Code PIX abaixo para regularizar e liberar o painel instantaneamente:</p>
-        
-        <div id="adminPixContainer" style="background: white; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
-            <span style="color: #334155; font-size: 0.85rem;">Carregando PIX...</span>
-        </div>
-
-        <div style="max-width: 380px; width: 100%;">
-            <input type="text" id="adminPixCopiaCola" readonly style="width: 100%; padding: 8px; font-size: 0.75rem; background: #0f172a; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; margin-bottom: 8px; text-align: center;">
-            <button onclick="copiarPixAdmin()" style="width: 100%; padding: 8px; background: #0ea5e9; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">📋 Copiar Código PIX</button>
-        </div>
-        <p style="color: #10b981; font-size: 0.8rem; font-weight: bold; margin-top: 12px;">⚡ O sistema é liberado automaticamente após a aprovação do pagamento!</p>
+        <p>Sua licença com o QG Mestre expirou. O painel administrativo encontra-se temporariamente restrito até a confirmação da regularização.</p>
     </div>
 
     <div class="dashboard-container">
@@ -276,55 +266,21 @@
     <script src="js/admin.js"></script>
     
     <script>
-        const MASTER_QG_URL = "https://admplaybar.onrender.com";
-        const CLIENT_ID = "playbarteste"; // ID exato cadastrado no Master QG
-        let pixCarregadoAdmin = false;
-
+        // Verificação de licença no painel admin do bar
         async function checkAdminLicense() {
             try {
-                const res = await fetch(`${MASTER_QG_URL}/api/check-license?client_id=${CLIENT_ID}`);
+                const res = await fetch('/api/status');
                 const data = await res.json();
                 const overlay = document.getElementById('adminBlockOverlay');
-                
                 if (data.ok && data.active === false) {
                     overlay.style.display = 'flex';
-                    if (!pixCarregadoAdmin) {
-                        carregarPixAdmin();
-                        pixCarregadoAdmin = true;
-                    }
                 } else {
                     overlay.style.display = 'none';
-                    pixCarregadoAdmin = false;
                 }
             } catch (error) {
                 console.error("Erro ao validar licença no painel admin:", error);
             }
         }
-
-        async function carregarPixAdmin() {
-            try {
-                const res = await fetch(`${MASTER_QG_URL}/api/create-pix`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ client_id: CLIENT_ID })
-                });
-                const data = await res.json();
-                if (data.ok) {
-                    document.getElementById('adminPixContainer').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width: 140px; height: 140px; border-radius: 4px;">`;
-                    document.getElementById('adminPixCopiaCola').value = data.qr_code;
-                }
-            } catch (e) {
-                console.error("Erro ao buscar PIX para o admin:", e);
-            }
-        }
-
-        function copiarPixAdmin() {
-            const input = document.getElementById('adminPixCopiaCola');
-            input.select();
-            navigator.clipboard.writeText(input.value);
-            alert('Código PIX copiado!');
-        }
-
         checkAdminLicense();
         setInterval(checkAdminLicense, 15000);
 
