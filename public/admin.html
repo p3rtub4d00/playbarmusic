@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f172a">
-    <title>Painel Administrativo | PlayBar</title>[cite: 6]
+    <title>Painel Administrativo | PlayBar</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/images/logo.png">
@@ -34,7 +34,7 @@
     <!-- AVISO DE BLOQUEIO NO PAINEL ADMIN COM PIX -->
     <div id="adminBlockOverlay">
         <h1>🔒 Sistema Suspenso por Inadimplência</h1>
-        <p style="margin-bottom: 20px;">Sua licença com a Central PlayBar expirou. Escaneie o QR Code PIX abaixo para regularizar e liberar o painel instantaneamente:[cite: 6]</p>
+        <p style="margin-bottom: 20px;">Sua licença com a Central PlayBar expirou. Escaneie o QR Code PIX abaixo para regularizar e liberar o painel instantaneamente:</p>
         
         <div id="adminPixContainer" style="background: white; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
             <span style="color: #334155; font-size: 0.85rem;">Carregando PIX...</span>
@@ -282,12 +282,15 @@
 
         async function checkAdminLicense() {
             try {
-                const res = await fetch(`${MASTER_QG_URL}/api/check-license?client_id=${CLIENT_ID}`);
+                // Voltou para a rota original que GARANTE a exibição da tela de bloqueio
+                const res = await fetch('/api/status');
                 const data = await res.json();
                 const overlay = document.getElementById('adminBlockOverlay');
                 
                 if (data.ok && data.active === false) {
                     overlay.style.display = 'flex';
+                    
+                    // Inicia o carregamento do PIX apenas após a tela já estar exibida
                     if (!pixCarregadoAdmin) {
                         carregarPixAdmin();
                         pixCarregadoAdmin = true;
@@ -297,7 +300,7 @@
                     pixCarregadoAdmin = false;
                 }
             } catch (error) {
-                console.error("Erro ao validar licença no painel admin:", error);
+                console.error("Erro ao validar licença no painel local:", error);
             }
         }
 
@@ -309,20 +312,26 @@
                     body: JSON.stringify({ client_id: CLIENT_ID })
                 });
                 const data = await res.json();
+                
                 if (data.ok) {
                     document.getElementById('adminPixContainer').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width: 140px; height: 140px; border-radius: 4px;">`;
                     document.getElementById('adminPixCopiaCola').value = data.qr_code;
+                } else {
+                    document.getElementById('adminPixContainer').innerHTML = `<span style="color:#ef4444; font-size:0.85rem;">Erro ao gerar PIX na central.</span>`;
                 }
             } catch (e) {
-                console.error("Erro ao buscar PIX para o admin:", e);
+                console.error("Erro ao buscar PIX na central:", e);
+                document.getElementById('adminPixContainer').innerHTML = `<span style="color:#ef4444; font-size:0.85rem;">Erro de conexão com a Central PlayBar.</span>`;
             }
         }
 
         function copiarPixAdmin() {
             const input = document.getElementById('adminPixCopiaCola');
-            input.select();
-            navigator.clipboard.writeText(input.value);
-            alert('Código PIX copiado!');
+            if (input.value) {
+                input.select();
+                navigator.clipboard.writeText(input.value);
+                alert('Código PIX copiado!');
+            }
         }
 
         checkAdminLicense();
