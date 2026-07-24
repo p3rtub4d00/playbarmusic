@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>PlayBar - Player</title> 
+  <title>PlayBar - Player</title>[cite: 5]
   <style>
     html, body {
       height: 100%;
@@ -247,10 +247,20 @@
 </head>
 <body>
 
-  <!-- TELA DE BLOQUEIO AUTOMÁTICO -->
+  <!-- TELA DE BLOQUEIO AUTOMÁTICO COM PIX -->
   <div id="blockOverlay">
       <h1>🔒 Sistema Suspenso</h1>
-      <p>A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pelo QG Mestre.<br>Entre em contato com o suporte técnico para restabelecer o sinal imediatamente.</p>
+      <p style="margin-bottom: 20px;">A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pela Central PlayBar.<br>Escaneie o QR Code PIX abaixo para reativar o sistema instantaneamente:[cite: 5]</p>
+      
+      <div id="playerPixContainer" style="background: white; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 15px;">
+          <span style="color: #334155; font-size: 0.9rem;">Carregando PIX...</span>
+      </div>
+      
+      <div style="max-width: 400px; width: 100%;">
+          <input type="text" id="playerPixCopiaCola" readonly style="width: 100%; padding: 10px; font-size: 0.8rem; background: #0f172a; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; margin-bottom: 10px; text-align: center;">
+          <button onclick="copiarPixPlayer()" style="width: 100%; padding: 10px; background: #0ea5e9; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">📋 Copiar Código PIX</button>
+      </div>
+      <p style="color: #10b981; font-size: 0.9rem; font-weight: bold; margin-top: 15px;">⚡ O sistema libera automaticamente assim que o pagamento for aprovado!</p>
   </div>
 
   <div id="player"></div>
@@ -283,9 +293,13 @@
   <script src="js/player.js"></script>
   
   <script>
+      const MASTER_QG_URL = "https://admplaybar.onrender.com";
+      const CLIENT_ID = "playbarteste"; // ID exato cadastrado no Master QG
+      let pixCarregadoPlayer = false;
+
       async function checkLicenseStatus() {
           try {
-              const res = await fetch('/api/status');
+              const res = await fetch(`${MASTER_QG_URL}/api/check-license?client_id=${CLIENT_ID}`);
               const data = await res.json();
               const overlay = document.getElementById('blockOverlay');
               
@@ -296,13 +310,45 @@
                   if (typeof player !== 'undefined' && typeof player.pauseVideo === 'function') {
                       player.pauseVideo();
                   }
+                  
+                  // Carrega o QR Code apenas se ainda não foi carregado
+                  if (!pixCarregadoPlayer) {
+                      carregarPixPlayer();
+                      pixCarregadoPlayer = true;
+                  }
               } else {
                   overlay.style.display = 'none';
+                  pixCarregadoPlayer = false;
               }
           } catch (error) {
               console.error("Erro ao validar licença:", error);
           }
       }
+
+      async function carregarPixPlayer() {
+          try {
+              const res = await fetch(`${MASTER_QG_URL}/api/create-pix`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ client_id: CLIENT_ID })
+              });
+              const data = await res.json();
+              if (data.ok) {
+                  document.getElementById('playerPixContainer').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width: 160px; height: 160px; border-radius: 4px;">`;
+                  document.getElementById('playerPixCopiaCola').value = data.qr_code;
+              }
+          } catch (e) {
+              console.error("Erro ao buscar PIX:", e);
+          }
+      }
+
+      function copiarPixPlayer() {
+          const input = document.getElementById('playerPixCopiaCola');
+          input.select();
+          navigator.clipboard.writeText(input.value);
+          alert('Código PIX copiado com sucesso!');
+      }
+
       checkLicenseStatus();
       setInterval(checkLicenseStatus, 15000);
   </script>
