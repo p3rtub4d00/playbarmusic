@@ -7,19 +7,29 @@ import youtubeSearchApi from "youtube-search-api";
 import mongoose from "mongoose";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import fetch from "node-fetch";
 
 dotenv.config();
 const scrypt = promisify(scryptCallback);
 
-// --- Configuração do MongoDB / Mongoose ---
+// --- Configuração das Variáveis do QG Mestre ---
+const RAW_MASTER_URL = process.env.MASTER_URL || '';
+const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, ''); // Remove barra dupla do final se houver
+const CLIENT_ID = process.env.CLIENT_ID || '';
+
+if (!MASTER_URL || !CLIENT_ID) {
+  console.warn("⚠️ ATENÇÃO: MASTER_URL ou CLIENT_ID não configurados nas variáveis de ambiente!");
+} else {
+  console.log(`🔗 Sincronizado com o QG Mestre: ${MASTER_URL} [Client ID: ${CLIENT_ID}]`);
+}
+
+// --- Conexão MongoDB ---
 console.log('[System] Iniciando conexão com MongoDB...');
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ Conectado ao MongoDB com sucesso!'))
   .catch((err) => console.error('❌ Erro CRÍTICO ao conectar ao MongoDB:', err));
 
-// --- Schemas (Modelos de Dados) ---
-
-// 1. Configurações Globais
+// --- Schemas ---
 const ConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'main_config', unique: true },
   dailyRevenue: { type: Number, default: 0.0 },
@@ -29,13 +39,12 @@ const ConfigSchema = new mongoose.Schema({
   adminPasswordHash: String,
   adminPasswordChangedAt: Date,
   maxPlaybackMinutes: { type: Number, default: 5 },
-  autoplayMode: { type: String, default: 'manual' }, // 'manual' ou 'playlist'
-  playlistLink: { type: String, default: '' }, // Termo ou link de busca
-  blockedKeywords: { type: [String], default: [] } // Lista de palavras/termos proibidos
+  autoplayMode: { type: String, default: 'manual' },
+  playlistLink: { type: String, default: '' },
+  blockedKeywords: { type: [String], default: [] }
 });
 const ConfigModel = mongoose.model('Config', ConfigSchema);
 
-// 2. Lista de Inatividade
 const InactivitySongSchema = new mongoose.Schema({
   title: String,
   videoId: String,
@@ -43,7 +52,6 @@ const InactivitySongSchema = new mongoose.Schema({
 });
 const InactivityModel = mongoose.model('InactivitySong', InactivitySongSchema);
 
-// 3. Pagamentos
 const PaymentSchema = new mongoose.Schema({
   mpPaymentId: { type: String, unique: true },
   socketId: String,
@@ -62,15 +70,13 @@ const PaymentSchema = new mongoose.Schema({
 });
 const PaymentModel = mongoose.model('Payment', PaymentSchema);
 
-// 4. Cache de Busca
 const SearchCacheSchema = new mongoose.Schema({
   term: { type: String, unique: true },
   results: Array, 
-  createdAt: { type: Date, default: Date.now, expires: 86400 } // Expira em 24h
+  createdAt: { type: Date, default: Date.now, expires: 86400 }
 });
 const SearchCacheModel = mongoose.model('SearchCache', SearchCacheSchema);
 
-// 5. Fila de Reprodução
 const QueueSchema = new mongoose.Schema({
   videoId: String,
   title: String,
@@ -78,12 +84,11 @@ const QueueSchema = new mongoose.Schema({
   message: String,
   userPhone: String,
   mpPaymentId: String,
-  priority: { type: Number, default: 1 }, // 1 = Cliente/Admin, 0 = Inatividade
+  priority: { type: Number, default: 1 },
   createdAt: { type: Date, default: Date.now }
 });
 const QueueModel = mongoose.model('Queue', QueueSchema);
 
-// 6. Histórico de músicas tocadas
 const PlayHistorySchema = new mongoose.Schema({
   videoId: String,
   title: String,
@@ -95,8 +100,6 @@ const PlayHistorySchema = new mongoose.Schema({
 });
 const PlayHistoryModel = mongoose.model('PlayHistory', PlayHistorySchema);
 
-
-// --- Inicialização do Servidor ---
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -169,10 +172,8 @@ app.post('/admin/change-password', requireAdminAuth, async (req, res) => {
     config.adminPasswordHash = await hashPassword(newPassword);
     config.adminPasswordChangedAt = new Date();
     await config.save();
-    console.log('[Admin] Senha do painel alterada.');
     return res.json({ ok: true });
   } catch (error) {
-    console.error('[Admin] Erro ao alterar senha:', error);
     return res.status(500).json({ ok: false, error: 'Não foi possível alterar a senha.' });
   }
 });
@@ -185,12 +186,44 @@ app.get('/health', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
 
-// Configuração do Mercado Pago
+// --- Rota interna para o Frontend verificar licença direto no QG Mestre ---
+app.get('/api/status', async (req, res) => {
+    try {
+        if (!MASTER_URL || !CLIENT_ID) {
+            return res.json({ ok: true, active: true });
+        }
+        const response = await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error("Erro ao conectar com o QG Mestre:", error);
+        res.json({ ok: true, active: true });
+    }
+});
+
+// --- ROTINA AUTOMÁTICA DE HEARTBEAT (Mantém o servidor Online no QG) ---
+async function sendHeartbeat() {
+  if (!MASTER_URL || !CLIENT_ID) return;
+  try {
+    const config = await getConfig();
+    // Bate na rota de checagem do QG apenas para atualizar o lastSeen e o faturamento
+    await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+    await fetch(`${MASTER_URL}/api/report-revenue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: CLIENT_ID, dailyRevenue: config.dailyRevenue })
+    });
+  } catch (err) {
+    // Silencia erros de rede temporários para não poluir o console
+  }
+}
+// Envia o sinal a cada 15 segundos
+setInterval(sendHeartbeat, 15000);
+
 const mpClient = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN
 });
 
-// --- Variáveis de Estado em Memória ---
 const INACTIVITY_TIMEOUT = 5000;
 let inactivityTimer = null;
 let customerPlaybackTimer = null; 
@@ -198,17 +231,14 @@ let nowPlayingInfo = null;
 let isCustomerPlaying = false;
 let isAdvancingQueue = false;
 
-// Helpers
 async function getConfig() {
   try {
     let config = await ConfigModel.findOne({ key: 'main_config' });
     if (!config) {
-      console.log('[DB] Configuração não encontrada, criando nova...');
       config = await ConfigModel.create({ key: 'main_config' });
     }
     return config;
   } catch (error) {
-    console.error('[DB] Erro ao ler Config:', error);
     return {
       dailyRevenue: 0.0,
       currentPromoText: "Erro ao carregar",
@@ -222,7 +252,6 @@ async function getConfig() {
   }
 }
 
-// --- Função de Filtro de Palavras Proibidas ---
 async function isTitleBlocked(title) {
   if (!title) return false;
   try {
@@ -250,38 +279,25 @@ async function fetchVideoIdByName(name) {
     }
     return null;
   } catch (err) {
-    console.error(`Erro ao buscar ID para "${name}":`, err.message);
     return null;
   }
 }
 
-// Controle do Player
 async function broadcastPlayerState() {
   try {
     const queue = await QueueModel.find({}).sort({ priority: -1, createdAt: 1 }).lean(); 
-    
     const formattedQueue = queue.map(item => ({
         id: item.videoId,
         title: item.title,
         isCustomer: item.isCustomer,
         message: item.message
     }));
-
-    const state = {
-      nowPlaying: nowPlayingInfo,
-      queue: formattedQueue
-    };
-    io.emit('updatePlayerState', state);
-  } catch (err) {
-    console.error('[Broadcast] Erro ao ler fila:', err);
-  }
+    io.emit('updatePlayerState', { nowPlaying: nowPlayingInfo, queue: formattedQueue });
+  } catch (err) {}
 }
 
 async function playNextInQueue() {
-  if (isAdvancingQueue) {
-    console.log('[Server] Avanço da fila já em andamento; evento duplicado ignorado.');
-    return;
-  }
+  if (isAdvancingQueue) return;
   isAdvancingQueue = true;
 
   if (inactivityTimer) clearTimeout(inactivityTimer);
@@ -296,30 +312,7 @@ async function playNextInQueue() {
       const nextVideo = await QueueModel.findOneAndDelete({}, { sort: { priority: -1, createdAt: 1 } });
 
       if (nextVideo) {
-        if (nextVideo.isCustomer && nextVideo.mpPaymentId) {
-          const songsFromSameOrder = await QueueModel.find({
-            mpPaymentId: nextVideo.mpPaymentId,
-            isCustomer: true
-          }).sort({ createdAt: 1 }).select('_id videoId').lean();
-
-          const seenVideoIds = new Set([nextVideo.videoId]);
-          const duplicateIds = songsFromSameOrder
-            .filter(song => {
-              if (seenVideoIds.has(song.videoId)) return true;
-              seenVideoIds.add(song.videoId);
-              return false;
-            })
-            .map(song => song._id);
-
-          if (duplicateIds.length > 0) {
-            await QueueModel.deleteMany({ _id: { $in: duplicateIds } });
-            console.log(`[Server] ${duplicateIds.length} música(s) duplicada(s) removida(s) do pedido ${nextVideo.mpPaymentId}.`);
-          }
-        }
-
-        const source = nextVideo.isCustomer
-          ? 'customer'
-          : (nextVideo.priority === 0 ? 'inactivity' : 'admin');
+        const source = nextVideo.isCustomer ? 'customer' : (nextVideo.priority === 0 ? 'inactivity' : 'admin');
 
         await PlayHistoryModel.create({
           videoId: nextVideo.videoId,
@@ -337,20 +330,14 @@ async function playNextInQueue() {
             isCustomer: nextVideo.isCustomer
         };
         isCustomerPlaying = nowPlayingInfo.isCustomer;
-        console.log(`[Server] Tocando: ${nowPlayingInfo.title} | É cliente? ${isCustomerPlaying}`);
         
         if (isCustomerPlaying) {
           const config = await getConfig();
           const maxMinutes = config.maxPlaybackMinutes || 5;
           const maxMs = maxMinutes * 60 * 1000;
-          console.log(`[Server] Limitando música de cliente a ${maxMinutes} minuto(s).`);
-          
           customerPlaybackTimer = setTimeout(() => {
-            console.log(`[Server] Tempo limite de ${maxMinutes} min atingido para cliente. Pulando música.`);
             playNextInQueue();
           }, maxMs);
-        } else {
-          console.log(`[Server] Música da Casa / Autoplay rodando livre sem limite de tempo.`);
         }
 
         io.emit('player:playVideo', {
@@ -359,14 +346,12 @@ async function playNextInQueue() {
           message: nowPlayingInfo.message
         });
       } else {
-        console.log('[Server] Fila vazia.');
         nowPlayingInfo = null;
         isCustomerPlaying = false;
         startInactivityTimer();
       }
       broadcastPlayerState();
   } catch (err) {
-      console.error('[PlayNext] Erro ao processar fila:', err);
   } finally {
       isAdvancingQueue = false;
   }
@@ -380,20 +365,15 @@ async function startInactivityTimer() {
     const queueCount = await QueueModel.countDocuments();
     if (nowPlayingInfo || queueCount > 0) return;
 
-    console.log(`[Server] Timer de inatividade (${INACTIVITY_TIMEOUT/1000}s) iniciado...`);
-
     inactivityTimer = setTimeout(async () => {
       if (nowPlayingInfo) return;
       const countCheck = await QueueModel.countDocuments();
       if (countCheck > 0) return; 
 
       const config = await getConfig();
-
       if (config.autoplayMode === 'playlist' && config.playlistLink) {
-          console.log(`[Server] Buscando música automática por termo: ${config.playlistLink}`);
           try {
               const searchResult = await youtubeSearchApi.GetListByKeyword(config.playlistLink, false, 15);
-              
               if (searchResult && searchResult.items && searchResult.items.length > 0) {
                   const validVideos = [];
                   for (const item of searchResult.items) {
@@ -401,10 +381,8 @@ async function startInactivityTimer() {
                           validVideos.push(item);
                       }
                   }
-
                   if (validVideos.length > 0) {
                       const randomVideo = validVideos[Math.floor(Math.random() * validVideos.length)];
-                      
                       await QueueModel.create({
                           videoId: randomVideo.id,
                           title: randomVideo.title,
@@ -412,19 +390,15 @@ async function startInactivityTimer() {
                           message: null,
                           priority: 0 
                       });
-                      
                       playNextInQueue();
                       return;
                   }
               }
-          } catch (err) {
-              console.error('[Server] Erro na busca dinâmica por gênero:', err);
-          }
+          } catch (err) {}
       }
 
       const inactivitySongs = await InactivityModel.find({}).lean(); 
       if (inactivitySongs.length > 0) {
-        console.log('[Server] Inatividade detectada. Carregando lista manual do banco.');
         const itemsToInsert = [];
         for (const song of inactivitySongs) {
             if (!(await isTitleBlocked(song.title))) {
@@ -437,7 +411,6 @@ async function startInactivityTimer() {
                 });
             }
         }
-
         if (itemsToInsert.length > 0) {
             await QueueModel.insertMany(itemsToInsert);
             playNextInQueue();
@@ -445,16 +418,11 @@ async function startInactivityTimer() {
             broadcastPlayerState();
         }
       } else {
-        console.log('[Server] Inatividade, mas banco de inatividade está vazio.');
         broadcastPlayerState();
       }
     }, INACTIVITY_TIMEOUT);
-  } catch (err) {
-    console.error('[Timer] Erro na inatividade:', err);
-  }
+  } catch (err) {}
 }
-
-// --- Rotas HTTP ---
 
 app.get("/user-history", async (req, res) => {
     try {
@@ -480,10 +448,8 @@ app.get("/user-history", async (req, res) => {
                 });
             }
         });
-
         res.json({ ok: true, history: Array.from(uniqueVideos.values()) });
     } catch (err) {
-        console.error(err);
         res.status(500).json({ ok: false, error: 'Erro ao buscar histórico' });
     }
 });
@@ -494,14 +460,12 @@ app.get("/search", async (req, res) => {
     if (!query) return res.status(400).json({ ok: false, error: "Consulta inválida" });
 
     const lowerQuery = query.toLowerCase().trim();
-
     const cachedEntry = await SearchCacheModel.findOne({ term: lowerQuery }).lean();
     if (cachedEntry) {
         return res.json({ ok: true, results: cachedEntry.results });
     }
 
     const result = await youtubeSearchApi.GetListByKeyword(query, false, 8);
-    
     const items = [];
     for (const item of result.items) {
       if (item.id && item.title) {
@@ -520,9 +484,7 @@ app.get("/search", async (req, res) => {
         await SearchCacheModel.create({ term: lowerQuery, results: items });
     }
     res.json({ ok: true, results: items });
-
   } catch (err) {
-    console.error("[Search] Erro:", err.message);
     res.status(500).json({ ok: false, error: "Erro interno na busca" });
   }
 });
@@ -538,7 +500,7 @@ app.post("/create-payment", async (req, res) => {
         }
     }
 
-    const notification_url = "https://playbarmusic.onrender.com/webhook"; 
+    const notification_url = `https://${req.get('host')}/webhook`; 
 
     const payment_data = {
       transaction_amount: Number(amount),
@@ -565,7 +527,6 @@ app.post("/create-payment", async (req, res) => {
       status: 'pending',
       videos: videos
     });
-    console.log(`[Server] Pagamento ${result.id} criado.`);
 
     res.json({
       ok: true,
@@ -574,7 +535,6 @@ app.post("/create-payment", async (req, res) => {
       copiaCola: result.point_of_interaction.transaction_data.qr_code
     });
   } catch (err) {
-    console.error("[Server] Erro Create-Payment:", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -593,6 +553,7 @@ app.get('/payment-status/:paymentId', async (req, res) => {
   }
 });
 
+// --- Webhook com Sincronização Automática de Faturamento com o QG Mestre ---
 app.post("/webhook", async (req, res) => {
   try {
     const notification = req.body;
@@ -623,6 +584,23 @@ app.post("/webhook", async (req, res) => {
         config.dailyRevenue += dbPayment.amount;
         await config.save();
         io.emit('admin:updateRevenue', config.dailyRevenue);
+
+        // SINCRONIZAÇÃO IMEDIATA COM O PAINEL MESTRE (QG)
+        if (MASTER_URL && CLIENT_ID) {
+            try {
+                await fetch(`${MASTER_URL}/api/report-revenue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        client_id: CLIENT_ID, 
+                        dailyRevenue: config.dailyRevenue 
+                    })
+                });
+                console.log('[Server] Faturamento sincronizado com o QG Mestre com sucesso!');
+            } catch (syncErr) {
+                console.error('[Server] Erro ao enviar faturamento para o QG Mestre:', syncErr.message);
+            }
+        }
 
         isCustomerPlaying = true;
         if (inactivityTimer) clearTimeout(inactivityTimer);
@@ -668,11 +646,7 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// --- Socket.IO ---
-
 io.on("connection", async (socket) => {
-  console.log("[Socket] Conectado:", socket.id);
-  
   socket.on('player:ready', async () => {
     const [freshConfig, queue] = await Promise.all([
         getConfig(),
@@ -739,10 +713,7 @@ io.on("connection", async (socket) => {
             message: item.message 
         }));
         socket.emit('admin:updatePlayerState', { nowPlaying: nowPlayingInfo, queue: formattedQueue });
-
-    } catch(e) {
-        console.error('[Admin] Erro ao carregar dados:', e);
-    }
+    } catch(e) {}
   });
 
   socket.on('admin:getPlayHistory', async () => {
@@ -760,6 +731,15 @@ io.on("connection", async (socket) => {
       config.dailyRevenue = 0;
       await config.save();
       io.emit('admin:updateRevenue', config.dailyRevenue);
+      
+      if (MASTER_URL && CLIENT_ID) {
+          await fetch(`${MASTER_URL}/api/report-revenue`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ client_id: CLIENT_ID, dailyRevenue: 0 })
+          });
+      }
+
       if (typeof callback === 'function') callback({ ok: true });
     } catch (error) {
       if (typeof callback === 'function') callback({ ok: false });
@@ -793,19 +773,14 @@ io.on("connection", async (socket) => {
         const result = { ok: true, saved: newItems.length, failedTitles, items: newItems };
         socket.emit('admin:inactivityListSaved', result);
         if (typeof callback === 'function') callback(result);
-
     } catch (err) {
-        const result = { ok: false, error: 'Não foi possível salvar a lista.' };
-        socket.emit('admin:inactivityListSaved', result);
-        if (typeof callback === 'function') callback(result);
+        if (typeof callback === 'function') callback({ ok: false, error: 'Erro ao salvar.' });
     }
   });
 
   socket.on('admin:searchForInactivityList', async (query) => {
       try {
-        if (await isTitleBlocked(query)) {
-            return socket.emit('admin:inactivitySearchResults', []);
-        }
+        if (await isTitleBlocked(query)) return socket.emit('admin:inactivitySearchResults', []);
         const result = await youtubeSearchApi.GetListByKeyword(query, false, 5);
         const items = [];
         for (const i of result.items) {
@@ -819,9 +794,7 @@ io.on("connection", async (socket) => {
 
   socket.on('admin:search', async (query) => {
       try {
-        if (await isTitleBlocked(query)) {
-            return socket.emit('admin:searchResults', []);
-        }
+        if (await isTitleBlocked(query)) return socket.emit('admin:searchResults', []);
         const result = await youtubeSearchApi.GetListByKeyword(query, false, 5);
         const items = [];
         for (const i of result.items) {
@@ -893,7 +866,7 @@ io.on("connection", async (socket) => {
           io.emit('admin:loadBlockedKeywords', cleanKeywords);
           if (typeof callback === 'function') callback({ ok: true, keywords: cleanKeywords });
       } catch (err) {
-          if (typeof callback === 'function') callback({ ok: false, error: 'Erro ao salvar palavras bloqueadas.' });
+          if (typeof callback === 'function') callback({ ok: false });
       }
   });
 
