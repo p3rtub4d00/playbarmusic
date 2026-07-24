@@ -1,4 +1,4 @@
-[source: 7]<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -8,7 +8,7 @@
       height: 100%;
       margin: 0;
       background: black;
-      overflow: hidden; /* Impede barras de rolagem */
+      overflow: hidden;
       font-family: Arial, sans-serif;
     }
     #player {
@@ -27,7 +27,7 @@
       left: 0;
       width: 100%;
       background-color: rgba(0, 0, 0, 0.85); 
-      color: #ffd700; /* Ouro */
+      color: #ffd700; 
       padding: 15px 0; 
       font-size: 1.8rem; 
       font-weight: bold;
@@ -71,7 +71,7 @@
     #queue-overlay h3 {
       margin: 0 0 10px 0;
       font-size: 1.2rem;
-      color: #e67e22; /* Laranja da marca */
+      color: #e67e22;
       border-bottom: 1px solid #555;
       padding-bottom: 5px;
       text-align: center;
@@ -104,7 +104,7 @@
     }
 
     #queue-list li.is-customer {
-      color: #00ffcc; /* Destaque para cliente */
+      color: #00ffcc;
     }
     
     #queue-list li.is-customer .song-title::after {
@@ -164,8 +164,8 @@
         padding: 30px 50px;
         color: #fff;
         text-align: center;
-        z-index: 100; /* Acima de tudo */
-        display: none; /* Escondido por padrão */
+        z-index: 100;
+        display: none;
         box-shadow: 0 0 40px rgba(0, 255, 204, 0.6);
         opacity: 0;
         transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -199,7 +199,7 @@
         margin-top: 10px;
     }
 
-    /* --- CONTAINER DE REAÇÕES (CHUVA DE EMOJIS) --- */
+    /* --- CONTAINER DE REAÇÕES --- */
     #reaction-container {
         position: fixed;
         top: 0;
@@ -283,14 +283,19 @@
   <script src="js/player.js"></script>
   
   <script>
-      // Checagem de licença e bloqueio automático na TV do bar
       async function checkLicenseStatus() {
           try {
               const res = await fetch('/api/status');
               const data = await res.json();
               const overlay = document.getElementById('blockOverlay');
+              
               if (data.ok && data.active === false) {
+                  // Exibe a tela preta
                   overlay.style.display = 'flex';
+                  // Pausa imediatamente o áudio/vídeo do player
+                  if (typeof player !== 'undefined' && typeof player.pauseVideo === 'function') {
+                      player.pauseVideo();
+                  }
               } else {
                   overlay.style.display = 'none';
               }
