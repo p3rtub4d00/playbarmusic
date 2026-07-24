@@ -23,7 +23,7 @@ mongoose.connect(process.env.MONGO_URI)
 const ConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'main_config', unique: true },
   dailyRevenue: { type: Number, default: 0.0 },
-  currentPromoText: { type: String, default: "Bem-vindo ao Contêiner Music Box!" },
+  currentPromoText: { type: String, default: "Bem-vindo ao PlayBar!" },
   currentVolume: { type: Number, default: 50 },
   isMuted: { type: Boolean, default: true },
   adminPasswordHash: String,
@@ -532,14 +532,13 @@ app.post("/create-payment", async (req, res) => {
     const { videos, amount, description, message, socketId, userPhone } = req.body;
     if (!videos || !amount || !socketId) return res.status(400).json({ ok: false, error: "Dados inválidos." });
 
-    // Valida se algum vídeo contém palavra bloqueada antes de cobrar
     for (const v of videos) {
         if (await isTitleBlocked(v.title)) {
             return res.status(400).json({ ok: false, error: `A música "${v.title}" não é permitida pelo estabelecimento.` });
         }
     }
 
-    const notification_url = "https://conteinermusic.onrender.com/webhook"; 
+    const notification_url = "https://playbarmusic.onrender.com/webhook"; 
 
     const payment_data = {
       transaction_amount: Number(amount),
@@ -881,7 +880,6 @@ io.on("connection", async (socket) => {
       await config.save();
   });
 
-  // --- Gerenciamento de Palavras Bloqueadas via Admin ---
   socket.on('admin:saveBlockedKeywords', async (keywordsArray, callback) => {
       try {
           const config = await getConfig();
