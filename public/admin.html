@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+[source: 8]<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f172a">
-    <title>Painel de Controle | Contêiner Music Box</title>
+    <title>Painel Administrativo | PlayBar</title>
     
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/images/logo.png">
@@ -16,14 +16,32 @@
     
     <!-- Toastify CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    
+    <style>
+        /* Tela de bloqueio interna para o painel admin caso suspensos */
+        #adminBlockOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #020617; display: none; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 99999;
+            text-align: center; padding: 20px; color: #fff;
+        }
+        #adminBlockOverlay h1 { font-size: 2.5rem; color: #ef4444; margin-bottom: 15px; }
+        #adminBlockOverlay p { font-size: 1.1rem; color: #94a3b8; max-width: 500px; line-height: 1.5; }
+    </style>
 </head>
 <body>
     
+    <!-- AVISO DE BLOQUEIO NO PAINEL ADMIN -->
+    <div id="adminBlockOverlay">
+        <h1>🔒 Sistema Suspenso por Inadimplência</h1>
+        <p>Sua licença com o QG Mestre expirou. O painel administrativo encontra-se temporariamente restrito até a confirmação da regularização.</p>
+    </div>
+
     <div class="dashboard-container">
         <!-- Menu Lateral (Sidebar) -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="/images/logo.png" alt="Contêiner Music" class="logo-img" id="logo" onerror="this.src='https://via.placeholder.com/150x40?text=CONTEINER+MUSIC'">
+                <img src="/images/logo.png" alt="PlayBar" class="logo-img" id="logo" onerror="this.src='https://via.placeholder.com/150x40?text=PLAYBAR'">
             </div>
             
             <nav class="sidebar-nav">
@@ -161,7 +179,7 @@
                             </div>
                         </div>
 
-                        <!-- MODO 2: Playlist por Gênero (Busca Estável por Termos) -->
+                        <!-- MODO 2: Playlist por Gênero -->
                         <div id="playlistAutoplaySection" style="display: none;">
                             <div class="form-group vertical">
                                 <label class="form-label">Escolha o Estilo Musical (Autoplay)</label>
@@ -248,6 +266,24 @@
     <script src="js/admin.js"></script>
     
     <script>
+        // Verificação de licença no painel admin do bar
+        async function checkAdminLicense() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                const overlay = document.getElementById('adminBlockOverlay');
+                if (data.ok && data.active === false) {
+                    overlay.style.display = 'flex';
+                } else {
+                    overlay.style.display = 'none';
+                }
+            } catch (error) {
+                console.error("Erro ao validar licença no painel admin:", error);
+            }
+        }
+        checkAdminLicense();
+        setInterval(checkAdminLicense, 15000);
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
