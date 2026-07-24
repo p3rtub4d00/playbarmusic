@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>PlayBar - Player</title>[cite: 1]
+  <title>PlayBar - Player</title>[cite: 4]
   <style>
     html, body {
       height: 100%;
@@ -250,7 +250,7 @@
   <!-- TELA DE BLOQUEIO AUTOMÁTICO COM PIX -->
   <div id="blockOverlay">
       <h1>🔒 Sistema Suspenso</h1>
-      <p style="margin-bottom: 20px;">A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pelo QG Mestre[cite: 1].<br>Escaneie o QR Code PIX abaixo para reativar o sistema instantaneamente:</p>
+      <p style="margin-bottom: 15px;">A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pelo QG Mestre[cite: 4].<br>Escaneie o QR Code PIX abaixo para reativar o sistema instantaneamente:</p>
       
       <div id="playerPixContainer" style="background: white; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 15px;">
           <span style="color: #334155; font-size: 0.9rem;">Carregando PIX...</span>
@@ -294,7 +294,7 @@
   
   <script>
       const MASTER_QG_URL = "https://admplaybar.onrender.com";
-      const CLIENT_ID = "playbarteste"; // Altere para o ID exato deste bar cadastrado no Master QG
+      const CLIENT_ID = "playbarteste"; // ID exato cadastrado no Master QG
       let pixCarregadoPlayer = false;
 
       async function checkLicenseStatus() {
@@ -317,7 +317,7 @@
                   pixCarregadoPlayer = false;
               }
           } catch (error) {
-              console.error("Erro ao validar licença:", error);
+              console.error("Erro ao validar licença[cite: 4]:", error);
           }
       }
 
