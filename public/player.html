@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>PlayBar - Player</title>[cite: 5]
+  <title>PlayBar - Player</title> 
   <style>
     html, body {
       height: 100%;
@@ -250,7 +250,7 @@
   <!-- TELA DE BLOQUEIO AUTOMÁTICO COM PIX -->
   <div id="blockOverlay">
       <h1>🔒 Sistema Suspenso</h1>
-      <p style="margin-bottom: 20px;">A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pela Central PlayBar.<br>Escaneie o QR Code PIX abaixo para reativar o sistema instantaneamente:[cite: 5]</p>
+      <p style="margin-bottom: 20px;">A licença deste estabelecimento expirou ou o pagamento pendente não foi confirmado pela Central PlayBar.<br>Escaneie o QR Code PIX abaixo para reativar o sistema instantaneamente:</p>
       
       <div id="playerPixContainer" style="background: white; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 15px;">
           <span style="color: #334155; font-size: 0.9rem;">Carregando PIX...</span>
@@ -299,19 +299,21 @@
 
       async function checkLicenseStatus() {
           try {
-              const res = await fetch(`${MASTER_QG_URL}/api/check-license?client_id=${CLIENT_ID}`);
+              // Voltou para a rota original que GARANTE a exibição da tela de bloqueio
+              const res = await fetch('/api/status');
               const data = await res.json();
               const overlay = document.getElementById('blockOverlay');
               
               if (data.ok && data.active === false) {
                   // Exibe a tela preta
                   overlay.style.display = 'flex';
+                  
                   // Pausa imediatamente o áudio/vídeo do player
                   if (typeof player !== 'undefined' && typeof player.pauseVideo === 'function') {
                       player.pauseVideo();
                   }
                   
-                  // Carrega o QR Code apenas se ainda não foi carregado
+                  // Inicia o carregamento do PIX apenas após a tela já estar exibida
                   if (!pixCarregadoPlayer) {
                       carregarPixPlayer();
                       pixCarregadoPlayer = true;
@@ -321,7 +323,7 @@
                   pixCarregadoPlayer = false;
               }
           } catch (error) {
-              console.error("Erro ao validar licença:", error);
+              console.error("Erro ao validar licença local:", error);
           }
       }
 
@@ -333,20 +335,26 @@
                   body: JSON.stringify({ client_id: CLIENT_ID })
               });
               const data = await res.json();
+              
               if (data.ok) {
                   document.getElementById('playerPixContainer').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width: 160px; height: 160px; border-radius: 4px;">`;
                   document.getElementById('playerPixCopiaCola').value = data.qr_code;
+              } else {
+                  document.getElementById('playerPixContainer').innerHTML = `<span style="color:#ef4444; font-size:0.9rem;">Erro ao gerar PIX na central.</span>`;
               }
           } catch (e) {
-              console.error("Erro ao buscar PIX:", e);
+              console.error("Erro ao buscar PIX na central:", e);
+              document.getElementById('playerPixContainer').innerHTML = `<span style="color:#ef4444; font-size:0.9rem;">Erro de conexão com a Central PlayBar.</span>`;
           }
       }
 
       function copiarPixPlayer() {
           const input = document.getElementById('playerPixCopiaCola');
-          input.select();
-          navigator.clipboard.writeText(input.value);
-          alert('Código PIX copiado com sucesso!');
+          if (input.value) {
+              input.select();
+              navigator.clipboard.writeText(input.value);
+              alert('Código PIX copiado com sucesso!');
+          }
       }
 
       checkLicenseStatus();
