@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contêiner Music Box</title>
+  <title>PlayBar</title>
   
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/images/logo.png">
@@ -17,13 +17,13 @@
 
   <div class="header-plate-wrapper">
       <div class="header-plate">
-          <img src="/images/logo.png" alt="Contêiner Beer" id="logo">
+          <img src="/images/logo.png" alt="PlayBar" id="logo">
       </div>
   </div>
 
   <div class="container">
      <header>
-      <h1>CONTEINER MUSIC BOX</h1>
+      <h1>PLAYBAR</h1>
       <p class="welcome-message">Selecione seu pacote e interaja.</p>
       <button id="installAppBtn" style="display: none; margin: 10px auto; background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 50px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase;">📲 Instalar Aplicativo</button>
     </header>
@@ -176,6 +176,12 @@
           </div>
         </div>
     </div>
+
+    <!-- Rodapé com Direitos Autorais e Registro Fictício -->
+    <footer style="text-align: center; margin-top: 40px; padding: 20px 0; color: #666; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.05);">
+      <p style="margin-bottom: 4px;">&copy; Todos os direitos reservados a PlayBar Tecnologia</p>
+      <p style="font-size: 0.75rem; color: #444;">Registro de Software INPI: BR 51 2026 008945-2</p>
+    </footer>
   </div>
 
   <nav class="bottom-nav">
@@ -217,7 +223,6 @@
   <script src="js/main.js"></script>
   
   <script>
-    // Registro do Service Worker para permitir a instalação como App
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
