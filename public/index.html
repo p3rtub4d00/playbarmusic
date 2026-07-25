@@ -7,7 +7,7 @@
   
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/images/logo.png">
-  <meta name="theme-color" content="#09090b">
+  <meta name="theme-color" content="#050505">
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -25,19 +25,20 @@
      <header>
       <h1>PLAYBAR</h1>
       <p class="welcome-message">Selecione seu pacote e interaja.</p>
-      <button id="installAppBtn" style="display: none; margin: 15px auto; background-color: var(--brand-green); color: #000; border: none; padding: 12px; border-radius: 50px; font-weight: 800; cursor: pointer; width: 100%; text-transform: uppercase;">📲 Instalar Aplicativo</button>
+      <button id="installAppBtn" style="display: none; margin: 10px auto; background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 50px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase;">📲 Instalar Aplicativo</button>
     </header>
 
     <div id="user-profile-area" style="display: none;">
         <div class="dark-panel profile-panel">
             <div class="profile-header">
-                <h2 style="color: var(--brand-green); text-transform: uppercase; margin: 0; font-size: 1.1rem;">🎵 Suas Favoritas</h2>
-                <button id="logoutBtn" style="background: none; border: 1px solid #3f3f46; color: #a1a1aa; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem;">Sair</button>
+                <h2>🎵 Suas Favoritas</h2>
+                <button id="logoutBtn">Sair</button>
             </div>
-            <p id="user-phone-display" style="margin-bottom: 10px; color: #fff;"></p>
+            <p id="user-phone-display"></p>
             
-            <div id="history-loading" style="color: var(--text-muted);">Carregando histórico...</div>
-            <div id="history-list"></div>
+            <div id="history-loading">Carregando histórico...</div>
+            <div id="history-list">
+                </div>
         </div>
         
         <button id="backToHomeBtn" class="btn-secondary">VOLTAR PARA O INÍCIO</button>
@@ -56,7 +57,7 @@
             </div>
         </div>
 
-        <div id="wizard-progress" style="margin-bottom:20px; margin-top: 25px;">
+        <div id="wizard-progress" class="dark-panel" style="margin-bottom:15px;">
           <div class="wizard-steps">
             <span class="wizard-step active" data-step="1">1. Pacote</span>
             <span class="wizard-step" data-step="2">2. Músicas</span>
@@ -92,15 +93,15 @@
 
         <div id="step-2" class="wizard-screen" style="display:none;">
           <div id="search-area">
-            <input type="text" id="searchInput" placeholder="Digite o artista ou música...">
+            <input type="text" id="searchInput" placeholder="Digite o nome do artista ou música...">
             <button id="searchBtn">BUSCAR</button>
           </div>
 
           <div id="results-wrapper"><div id="results"></div></div>
 
-          <div id="selection-area" class="dark-panel" style="margin-top: 15px;">
-            <h2 style="color: var(--brand-green); font-size: 1rem; text-transform: uppercase; margin-bottom: 10px;">Sua seleção (<span id="count">0</span>/<span id="limit">3</span>)</h2>
-            <ul id="selected" style="list-style: none; padding: 0;"></ul>
+          <div id="selection-area">
+            <h2>Sua seleção (<span id="count">0</span>/<span id="limit">3</span>)</h2>
+            <ul id="selected"></ul>
           </div>
 
           <div id="action-buttons">
@@ -111,15 +112,15 @@
 
         <div id="step-3" class="wizard-screen" style="display:none;">
           <div class="dark-panel" style="text-align:left; margin-bottom:15px;">
-            <h2 style="margin-bottom:8px; color: var(--brand-green);">Revisão do Pedido</h2>
-            <p id="reviewPackageText" style="color: #fff;"></p>
-            <p id="reviewPriceText" style="color: #fff;"></p>
-            <p id="reviewCountText" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;"></p>
+            <h2 style="margin-bottom:8px;">Revisão do Pedido</h2>
+            <p id="reviewPackageText"></p>
+            <p id="reviewPriceText"></p>
+            <p id="reviewCountText"></p>
           </div>
 
-          <div id="review-selection-area" class="dark-panel">
-            <h2 style="margin-bottom: 10px; color: #fff; font-size: 1.1rem;">Músicas escolhidas</h2>
-            <ul id="reviewSelected" style="list-style: none; padding: 0;"></ul>
+          <div id="review-selection-area">
+            <h2>Músicas escolhidas</h2>
+            <ul id="reviewSelected"></ul>
           </div>
 
           <div id="action-buttons">
@@ -130,7 +131,7 @@
 
         <div id="step-4" class="wizard-screen" style="display:none;">
           <div id="now-playing-area" style="display: none;">
-            <span class="label">Tocando Agora na TV:</span>
+            <span class="label">Tocando:</span>
             <span id="nowPlayingTitle">...</span>
           </div>
 
@@ -140,33 +141,46 @@
           </div>
 
           <div id="pixArea" style="display:none;">
-            <h2 id="pixTitle" style="margin-bottom: 15px;">Escaneie ou Copie o PIX</h2>
+            <h2 id="pixTitle">Faça o PIX</h2>
             <img id="qrCode" alt="QR Code PIX" style="display: block;">
             <div class="copia-cola-wrapper" style="display: block;">
+                <p><b>Copia e Cola:</b></p>
                 <textarea id="copiaCola" readonly></textarea>
-                <button id="copyPixBtn" class="btn-copy">COPIAR CÓDIGO PIX</button>
+                <button id="copyPixBtn" class="btn-copy">COPIAR CÓDIGO</button>
             </div>
-            <p id="paymentStatusMsg" style="display: none; margin-top: 15px; font-weight: 600;"></p>
+            <p id="paymentStatusMsg" style="display: none;"></p>
           </div>
         </div>
 
         <div id="step-5" class="wizard-screen" style="display:none;">
-          <div class="dark-panel" style="text-align:center; margin-bottom:15px; padding: 40px 20px;">
-            <div style="font-size: 3rem; margin-bottom: 15px;">🎵</div>
-            <h2 style="margin-bottom:8px; color: var(--brand-green);">Tudo Certo!</h2>
-            <p id="orderStatusText" style="font-size: 1.1rem; margin-bottom: 10px; font-weight: 600;">Aguardando confirmação...</p>
-            <p style="color: var(--text-muted); font-size: 0.95rem;">Assim que o pagamento for aprovado, seu pedido entra na fila da TV.</p>
+          <div class="dark-panel" style="text-align:left; margin-bottom:15px;">
+            <h2 style="margin-bottom:8px;">Acompanhamento</h2>
+            <p id="orderStatusText">Aguardando pagamento...</p>
+            <p>Assim que o pagamento for aprovado, seu pedido entra na fila.</p>
           </div>
           <div id="action-buttons">
             <button id="newOrderBtn" class="btn-primary">FAZER NOVO PEDIDO</button>
           </div>
         </div>
 
+        <!-- Legacy blocks mantidos apenas para compatibilidade visual -->
+        <div style="display:none;">
+          <div id="package-selection-legacy">
+            <div class="package-option">
+              <div class="floating-icon">🍻</div>
+              <label>
+                <input type="radio" name="package_legacy" value="3">
+                <span>PACOTE 3<br>MÚSICAS</span>
+              </label>
+            </div>
+          </div>
+        </div>
     </div>
 
-    <footer style="text-align: center; margin-top: 40px; padding: 20px 0; color: #52525b; font-size: 0.85rem; border-top: 1px solid #27272a;">
+    <!-- Rodapé com Direitos Autorais e Registro Fictício -->
+    <footer style="text-align: center; margin-top: 40px; padding: 20px 0; color: #666; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.05);">
       <p style="margin-bottom: 4px;">&copy; Todos os direitos reservados a PlayBar Tecnologia</p>
-      <p style="font-size: 0.75rem;">Registro de Software INPI: BR 51 2026 008945-2</p>
+      <p style="font-size: 0.75rem; color: #444;">Registro de Software INPI: BR 51 2026 008945-2</p>
     </footer>
   </div>
 
@@ -175,6 +189,34 @@
       <a href="#" class="nav-item" id="nav-user"><span class="material-icons-round">person</span></a>
       <a href="#" class="nav-item"><span class="material-icons-round">library_music</span></a>
   </nav>
+
+  <div id="loginModal" class="modal-overlay" style="display: none;">
+     <div class="modal-content">
+      <span class="modal-close-btn" id="loginCloseBtn">&times;</span>
+      <h2 style="color: var(--neon-orange); text-transform: uppercase;">Acesse seu Perfil</h2>
+      <p style="color: #ccc; margin-bottom: 20px;">Digite seu celular para ver suas músicas favoritas.</p>
+      
+      <input type="tel" id="userPhoneInput" placeholder="(11) 99999-9999" class="input-dark-modal">
+      
+      <button id="btnConfirmLogin" class="btn-modal btn-modal-yes">ACESSAR</button>
+    </div>
+  </div>
+
+  <div id="messageModal" class="modal-overlay" style="display: none;">
+     <div class="modal-content">
+      <span class="modal-close-btn" id="modalCloseBtn">&times;</span>
+      <h2 id="modalTitle">Mensagem Dedicada</h2>
+      <p id="modalQuestion">Deseja adicionar uma mensagem dedicada por + R$ 1,00?</p>
+      <div id="modalInitialButtons">
+        <button id="modalBtnYes" class="btn-modal btn-modal-yes">SIM (+ R$ 1,00)</button>
+        <button id="modalBtnNo" class="btn-modal btn-modal-no">NÃO, APENAS PAGAR</button>
+      </div>
+      <div id="modalMessageInputArea" style="display: none;">
+        <textarea id="modalMessageText" placeholder="Digite sua mensagem aqui..."></textarea>
+        <button id="modalBtnConfirm" class="btn-modal btn-modal-confirm">CONFIRMAR</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
