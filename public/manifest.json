@@ -1,10 +1,10 @@
 {
-  "name": "Contêiner Music Box",
-  "short_name": "Contêiner Music",
+  "name": "PlayBar",
+  "short_name": "PlayBar",
   "start_url": "/index.html",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#ff8800",
+  "background_color": "#050807",
+  "theme_color": "#22d365",
   "orientation": "portrait",
   "icons": [
     {

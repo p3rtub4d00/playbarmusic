@@ -23,8 +23,8 @@
 
   <div class="container">
      <header>
-      <h1>PLAYBAR</h1>
-      <p class="welcome-message">Selecione seu pacote e interaja.</p>
+      <h1>Escolha a trilha da sua noite</h1>
+      <p class="welcome-message">Monte seu pedido e envie para a fila em poucos toques.</p>
       <button id="installAppBtn" style="display: none; margin: 10px auto; background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 50px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase;">📲 Instalar Aplicativo</button>
     </header>
 
@@ -68,6 +68,10 @@
         </div>
 
         <div id="step-1" class="wizard-screen">
+          <div class="step-heading">
+            <span class="step-kicker">Primeiro passo</span>
+            <h2>Quantas músicas você quer pedir?</h2>
+          </div>
           <div id="package-selection">
               <div class="package-option">
                   <div class="floating-icon">🍻</div>
@@ -92,6 +96,10 @@
         </div>
 
         <div id="step-2" class="wizard-screen" style="display:none;">
+          <div class="step-heading compact-heading">
+            <span class="step-kicker">Sua seleção</span>
+            <h2>Busque suas músicas</h2>
+          </div>
           <div id="search-area">
             <input type="text" id="searchInput" placeholder="Digite o nome do artista ou música...">
             <button id="searchBtn">BUSCAR</button>

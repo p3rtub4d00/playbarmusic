@@ -110,8 +110,8 @@ function createReaction(emoji) {
 // QR Code Generator
 window.addEventListener('load', () => {
     if (qrImg) {
-        const currentUrl = window.location.origin;
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(currentUrl)}`;
+        const orderUrl = 'https://playbarmusic.onrender.com';
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(orderUrl)}`;
         console.log(`[Player.js] QR Code gerado para: ${currentUrl}`);
     }
     resetBotTimer();
