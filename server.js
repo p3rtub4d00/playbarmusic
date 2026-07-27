@@ -14,7 +14,7 @@ const scrypt = promisify(scryptCallback);
 
 // --- Configuração das Variáveis do QG Mestre ---
 const RAW_MASTER_URL = process.env.MASTER_URL || '';
-const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, ''); // Remove barra dupla do final se houver
+const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, '');
 const CLIENT_ID = process.env.CLIENT_ID || '';
 const QG_COMMISSION_PERCENT = Number(process.env.QG_COMMISSION_PERCENT);
 
@@ -34,6 +34,7 @@ mongoose.connect(process.env.MONGO_URI)
 const ConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'main_config', unique: true },
   dailyRevenue: { type: Number, default: 0.0 },
+  totalSales: { type: Number, default: 0.0 }, // NOVO: Faturamento acumulado
   currentPromoText: { type: String, default: "Bem-vindo ao PlayBar!" },
   currentVolume: { type: Number, default: 50 },
   isMuted: { type: Boolean, default: true },
@@ -203,25 +204,12 @@ app.get('/api/status', async (req, res) => {
 });
 
 function getCommissionPercent(masterData) {
-  const candidates = [
-    masterData?.commissionPercent,
-    masterData?.commission_percentage,
-    masterData?.commissionRate,
-    masterData?.commission_rate,
-    masterData?.commission,
-    masterData?.percentage,
-    masterData?.percentualComissao,
-    masterData?.percentual_comissao,
-    masterData?.comissao,
-    masterData?.client?.commissionPercent,
-    masterData?.client?.commission_percentage,
-    masterData?.client?.commission,
-    masterData?.client?.percentage,
-    masterData?.client?.percentualComissao,
-    masterData?.client?.comissao
-  ];
-  const percent = candidates.map(Number).find(value => Number.isFinite(value) && value >= 0 && value <= 100);
-  if (Number.isFinite(percent)) return percent;
+  // Agora espera dados de `check-license` (client)
+  const percent = Number(masterData?.client?.value);
+  const isPercentage = masterData?.client?.model?.includes('%') || masterData?.client?.model?.toLowerCase().includes('porcentagem');
+
+  if (isPercentage && Number.isFinite(percent)) return percent;
+
   return Number.isFinite(QG_COMMISSION_PERCENT) && QG_COMMISSION_PERCENT >= 0 && QG_COMMISSION_PERCENT <= 100
     ? QG_COMMISSION_PERCENT
     : null;
@@ -236,12 +224,14 @@ app.get('/api/admin/commission', requireAdminAuth, async (req, res) => {
       if (response.ok) masterData = await response.json();
     }
     const percent = getCommissionPercent(masterData);
-    const dailyRevenue = Number(config.dailyRevenue) || 0;
+    const totalSales = Number(config.totalSales) || 0; // Usa totalSales, não dailyRevenue
+
     return res.json({
       ok: true,
       percent,
-      dailyRevenue,
-      amountDue: percent === null ? null : dailyRevenue * (percent / 100)
+      dailyRevenue: Number(config.dailyRevenue) || 0, // Mantém para retrocompatibilidade
+      totalSales, // Novo campo
+      amountDue: percent === null ? null : totalSales * (percent / 100)
     });
   } catch (error) {
     return res.status(502).json({ ok: false, error: 'Nao foi possivel consultar a comissao no QG.' });
@@ -253,15 +243,20 @@ async function sendHeartbeat() {
   if (!MASTER_URL || !CLIENT_ID) return;
   try {
     const config = await getConfig();
-    // Bate na rota de checagem do QG apenas para atualizar o lastSeen e o faturamento
+    // Bate na rota de checagem do QG apenas para atualizar o lastSeen
     await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+    // Envia o faturamento E as vendas totais
     await fetch(`${MASTER_URL}/api/report-revenue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: CLIENT_ID, dailyRevenue: config.dailyRevenue })
+        body: JSON.stringify({ 
+            client_id: CLIENT_ID, 
+            dailyRevenue: config.dailyRevenue,
+            totalSales: config.totalSales 
+        })
     });
   } catch (err) {
-    // Silencia erros de rede temporários para não poluir o console
+    // Silencia erros de rede temporários
   }
 }
 // Envia o sinal a cada 15 segundos
@@ -288,6 +283,7 @@ async function getConfig() {
   } catch (error) {
     return {
       dailyRevenue: 0.0,
+      totalSales: 0.0,
       currentPromoText: "Erro ao carregar",
       currentVolume: 50,
       isMuted: true,
@@ -378,7 +374,6 @@ async function playNextInQueue() {
         };
         isCustomerPlaying = nowPlayingInfo.isCustomer;
         
-        // Only songs inserted from an approved customer purchase receive a time limit.
         if (isCustomerPlaying) {
           const config = await getConfig();
           const maxMinutes = config.maxPlaybackMinutes || 5;
@@ -631,6 +626,7 @@ app.post("/webhook", async (req, res) => {
 
         const config = await getConfig();
         config.dailyRevenue += dbPayment.amount;
+        config.totalSales += dbPayment.amount; // ATUALIZA O ACUMULADO
         await config.save();
         io.emit('admin:updateRevenue', config.dailyRevenue);
 
@@ -642,7 +638,8 @@ app.post("/webhook", async (req, res) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         client_id: CLIENT_ID, 
-                        dailyRevenue: config.dailyRevenue 
+                        dailyRevenue: config.dailyRevenue,
+                        totalSales: config.totalSales 
                     })
                 });
                 console.log('[Server] Faturamento sincronizado com o QG Mestre com sucesso!');
@@ -777,7 +774,7 @@ io.on("connection", async (socket) => {
   socket.on('admin:resetRevenue', async (callback) => {
     try {
       const config = await getConfig();
-      config.dailyRevenue = 0;
+      config.dailyRevenue = 0; // Zera apenas o diário. O totalSales acumula!
       await config.save();
       io.emit('admin:updateRevenue', config.dailyRevenue);
       
@@ -785,7 +782,11 @@ io.on("connection", async (socket) => {
           await fetch(`${MASTER_URL}/api/report-revenue`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ client_id: CLIENT_ID, dailyRevenue: 0 })
+              body: JSON.stringify({ 
+                  client_id: CLIENT_ID, 
+                  dailyRevenue: 0,
+                  totalSales: config.totalSales 
+              })
           });
       }
 
