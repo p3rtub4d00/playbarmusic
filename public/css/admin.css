@@ -112,6 +112,9 @@ ul { list-style: none; }
 .revenue-info { display: flex; flex-direction: column; }
 .revenue-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-light); font-weight: 600; }
 .revenue-value { font-size: 1.25rem; font-weight: 700; color: var(--success); }
+.commission-widget { margin-left: 12px; }
+.commission-value { color: #7c3aed; }
+.commission-percent { color: var(--text-light); font-size: 0.72rem; margin-top: 3px; }
 
 /* --- Layout Grid --- */
 .grid-layout {

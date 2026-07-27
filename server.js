@@ -16,6 +16,7 @@ const scrypt = promisify(scryptCallback);
 const RAW_MASTER_URL = process.env.MASTER_URL || '';
 const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, ''); // Remove barra dupla do final se houver
 const CLIENT_ID = process.env.CLIENT_ID || '';
+const QG_COMMISSION_PERCENT = Number(process.env.QG_COMMISSION_PERCENT);
 
 if (!MASTER_URL || !CLIENT_ID) {
   console.warn("⚠️ ATENÇÃO: MASTER_URL ou CLIENT_ID não configurados nas variáveis de ambiente!");
@@ -201,6 +202,52 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
+function getCommissionPercent(masterData) {
+  const candidates = [
+    masterData?.commissionPercent,
+    masterData?.commission_percentage,
+    masterData?.commissionRate,
+    masterData?.commission_rate,
+    masterData?.commission,
+    masterData?.percentage,
+    masterData?.percentualComissao,
+    masterData?.percentual_comissao,
+    masterData?.comissao,
+    masterData?.client?.commissionPercent,
+    masterData?.client?.commission_percentage,
+    masterData?.client?.commission,
+    masterData?.client?.percentage,
+    masterData?.client?.percentualComissao,
+    masterData?.client?.comissao
+  ];
+  const percent = candidates.map(Number).find(value => Number.isFinite(value) && value >= 0 && value <= 100);
+  if (Number.isFinite(percent)) return percent;
+  return Number.isFinite(QG_COMMISSION_PERCENT) && QG_COMMISSION_PERCENT >= 0 && QG_COMMISSION_PERCENT <= 100
+    ? QG_COMMISSION_PERCENT
+    : null;
+}
+
+app.get('/api/admin/commission', requireAdminAuth, async (req, res) => {
+  try {
+    const config = await getConfig();
+    let masterData = null;
+    if (MASTER_URL && CLIENT_ID) {
+      const response = await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+      if (response.ok) masterData = await response.json();
+    }
+    const percent = getCommissionPercent(masterData);
+    const dailyRevenue = Number(config.dailyRevenue) || 0;
+    return res.json({
+      ok: true,
+      percent,
+      dailyRevenue,
+      amountDue: percent === null ? null : dailyRevenue * (percent / 100)
+    });
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: 'Nao foi possivel consultar a comissao no QG.' });
+  }
+});
+
 // --- ROTINA AUTOMÁTICA DE HEARTBEAT (Mantém o servidor Online no QG) ---
 async function sendHeartbeat() {
   if (!MASTER_URL || !CLIENT_ID) return;
@@ -331,6 +378,7 @@ async function playNextInQueue() {
         };
         isCustomerPlaying = nowPlayingInfo.isCustomer;
         
+        // Only songs inserted from an approved customer purchase receive a time limit.
         if (isCustomerPlaying) {
           const config = await getConfig();
           const maxMinutes = config.maxPlaybackMinutes || 5;
@@ -348,6 +396,7 @@ async function playNextInQueue() {
       } else {
         nowPlayingInfo = null;
         isCustomerPlaying = false;
+        io.emit('player:stop');
         startInactivityTimer();
       }
       broadcastPlayerState();

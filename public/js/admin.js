@@ -27,6 +27,8 @@ const adminPlayHistoryList = document.getElementById('adminPlayHistory');
 const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
 const promoTextInput = document.getElementById('promoText');
 const savePromoBtn = document.getElementById('savePromoBtn');
+const commissionAmountSpan = document.getElementById('commissionAmount');
+const commissionPercentSpan = document.getElementById('commissionPercent');
 
 // Elementos do Filtro
 const blockedKeywordInput = document.getElementById('blockedKeywordInput');
@@ -56,6 +58,29 @@ function showToast(message, type = 'info') {
         stopOnFocus: true,
         style: { background: backgroundColor, borderRadius: "8px" },
     }).showToast();
+}
+
+function formatCurrency(value) {
+    return Number(value || 0).toFixed(2).replace('.', ',');
+}
+
+async function loadCommission() {
+    if (!commissionAmountSpan || !commissionPercentSpan) return;
+    try {
+        const response = await fetch('/api/admin/commission', { credentials: 'same-origin' });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error);
+        if (data.percent === null || data.percent === undefined) {
+            commissionAmountSpan.textContent = '--';
+            commissionPercentSpan.textContent = 'Percentual não informado pelo QG';
+            return;
+        }
+        commissionAmountSpan.textContent = formatCurrency(data.amountDue);
+        commissionPercentSpan.textContent = `${Number(data.percent).toLocaleString('pt-BR')}% do faturamento do dia`;
+    } catch (error) {
+        commissionAmountSpan.textContent = '--';
+        commissionPercentSpan.textContent = 'Comissão indisponível';
+    }
 }
 
 if (autoplayModeSelect) {
@@ -284,7 +309,10 @@ if (refreshHistoryBtn) {
 socket.on('connect', () => socket.emit('admin:getList'));
 socket.on('admin:updateRevenue', (amount) => {
   if (revenueSpan) revenueSpan.textContent = amount.toFixed(2).replace('.', ',');
+  loadCommission();
 });
+
+loadCommission();
 
 socket.on('admin:loadInactivityList', (nameArray) => {
   inactivityItems = (nameArray || []).map(item => typeof item === 'string' ? { title: item } : { title: item.title, videoId: item.videoId });

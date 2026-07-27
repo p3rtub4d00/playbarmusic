@@ -2,9 +2,6 @@ const socket = io();
 let player;
 let isPlayerReady = false;
 
-let currentVideoTimer = null;
-let maxPlaybackTimeMs = 5 * 60 * 1000; // 5 minutos (padrão)
-
 let pendingVideo = null;
 // Enquanto um novo vídeo está carregando, o iframe pode informar que o vídeo
 // anterior terminou. Esse evento não deve avançar a fila novamente.
@@ -146,20 +143,9 @@ function onPlayerReady(event) {
 }
 
 function onPlayerStateChange(event) {
-  if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-    if (currentVideoTimer) {
-      clearTimeout(currentVideoTimer);
-      currentVideoTimer = null;
-    }
-  }
   if (event.data === YT.PlayerState.PLAYING) {
     isLoadingNewVideo = false;
     hasReportedVideoEnd = false;
-    if (!currentVideoTimer) {
-      currentVideoTimer = setTimeout(() => {
-        reportVideoEnded();
-      }, maxPlaybackTimeMs);
-    }
   }
   else if (event.data === YT.PlayerState.ENDED) {
       if (isLoadingNewVideo || Date.now() < ignoreEndedEventsUntil) {
@@ -167,10 +153,6 @@ function onPlayerStateChange(event) {
         return;
       }
       if (synth && synth.speaking) synth.cancel();
-      if (currentVideoTimer) {
-          clearTimeout(currentVideoTimer);
-          currentVideoTimer = null;
-      }
       reportVideoEnded();
   }
 }
@@ -178,10 +160,6 @@ function onPlayerStateChange(event) {
 function onPlayerError(event) {
     console.warn(`[Player.js] Vídeo indisponível ou com erro (${event.data}). Pulando para o próximo.`);
     if (synth && synth.speaking) synth.cancel();
-    if (currentVideoTimer) {
-        clearTimeout(currentVideoTimer);
-        currentVideoTimer = null;
-    }
     reportVideoEnded();
 }
 
@@ -242,12 +220,6 @@ socket.on('player:setInitialState', (data) => {
   if (!isPlayerReady) return;
   player.setVolume(data.volume);
   if (data.isMuted) player.mute(); else player.unMute();
-  if (data.maxPlaybackMinutes) {
-    const minutes = Number(data.maxPlaybackMinutes);
-    if (Number.isFinite(minutes) && minutes > 0) {
-      maxPlaybackTimeMs = minutes * 60 * 1000;
-    }
-  }
 });
 socket.on('player:pause', () => {
   if (!isPlayerReady) return;
@@ -261,20 +233,16 @@ socket.on('player:setVolume', (data) => {
   if (data.isMuted) player.mute(); else player.unMute();
 });
 
-socket.on('player:setMaxPlaybackTime', (data) => {
-  const minutes = Number(data?.minutes);
-  if (Number.isFinite(minutes) && minutes > 0) {
-    maxPlaybackTimeMs = minutes * 60 * 1000;
-  }
+socket.on('player:stop', () => {
+  if (!isPlayerReady) return;
+  isLoadingNewVideo = false;
+  hasReportedVideoEnd = true;
+  player.stopVideo();
 });
 
 function playVideo({ videoId, title, message }) {
   if (!isPlayerReady) return;
   if (synth && synth.speaking) synth.cancel();
-  if (currentVideoTimer) {
-    clearTimeout(currentVideoTimer);
-    currentVideoTimer = null;
-  }
   // Marque antes de parar o vídeo atual: stopVideo pode disparar ENDED.
   isLoadingNewVideo = true;
   ignoreEndedEventsUntil = Date.now() + 1500;
