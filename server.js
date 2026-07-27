@@ -14,7 +14,7 @@ const scrypt = promisify(scryptCallback);
 
 // --- Configuração das Variáveis do QG Mestre ---
 const RAW_MASTER_URL = process.env.MASTER_URL || '';
-const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, '');
+const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, ''); // Remove barra dupla do final se houver
 const CLIENT_ID = process.env.CLIENT_ID || '';
 const QG_COMMISSION_PERCENT = Number(process.env.QG_COMMISSION_PERCENT);
 
@@ -224,13 +224,13 @@ app.get('/api/admin/commission', requireAdminAuth, async (req, res) => {
       if (response.ok) masterData = await response.json();
     }
     const percent = getCommissionPercent(masterData);
-    const totalSales = Number(config.totalSales) || 0; // Usa totalSales, não dailyRevenue
+    const totalSales = Number(config.totalSales) || 0; 
 
     return res.json({
       ok: true,
       percent,
-      dailyRevenue: Number(config.dailyRevenue) || 0, // Mantém para retrocompatibilidade
-      totalSales, // Novo campo
+      dailyRevenue: Number(config.dailyRevenue) || 0, 
+      totalSales, 
       amountDue: percent === null ? null : totalSales * (percent / 100)
     });
   } catch (error) {
@@ -243,20 +243,31 @@ async function sendHeartbeat() {
   if (!MASTER_URL || !CLIENT_ID) return;
   try {
     const config = await getConfig();
-    // Bate na rota de checagem do QG apenas para atualizar o lastSeen
-    await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
-    // Envia o faturamento E as vendas totais
-    await fetch(`${MASTER_URL}/api/report-revenue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            client_id: CLIENT_ID, 
-            dailyRevenue: config.dailyRevenue,
-            totalSales: config.totalSales 
-        })
-    });
+    
+    // 1. O cliente pergunta ao QG Mestre como está a situação dele
+    const response = await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+    const data = await response.json();
+
+    // 2. SE O QG ZEROU AS VENDAS (Significa que o PIX da comissão foi pago!)
+    if (data && data.client && data.client.totalSales === 0 && config.totalSales > 0) {
+        console.log('[Sincronização] Comissão paga no QG. Zerando acumulado local...');
+        config.totalSales = 0;
+        await config.save();
+    } 
+    // 3. Caso contrário, o cliente continua informando as novas vendas ao QG
+    else {
+        await fetch(`${MASTER_URL}/api/report-revenue`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                client_id: CLIENT_ID, 
+                dailyRevenue: config.dailyRevenue,
+                totalSales: config.totalSales 
+            })
+        });
+    }
   } catch (err) {
-    // Silencia erros de rede temporários
+    // Silencia erros de rede temporários para não poluir o console
   }
 }
 // Envia o sinal a cada 15 segundos
