@@ -280,6 +280,31 @@
     <!-- Scripts do Sistema -->
     <script src="/socket.io/socket.io.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        // Inline admin logic for commission update
+        async function fetchCommission() {
+            try {
+                const res = await fetch('/api/admin/commission');
+                if(res.ok) {
+                    const data = await res.json();
+                    const amountEl = document.getElementById('commissionAmount');
+                    const percentEl = document.getElementById('commissionPercent');
+                    
+                    if(data.percent !== null) {
+                        amountEl.innerText = data.amountDue.toFixed(2).replace('.', ',');
+                        percentEl.innerText = `${data.percent}% do acumulado (R$ ${data.totalSales.toFixed(2)})`;
+                    } else {
+                        amountEl.innerText = "--";
+                        percentEl.innerText = "Isento ou não configurado";
+                    }
+                }
+            } catch(e) {
+                console.error("Erro commission", e);
+            }
+        }
+        setInterval(fetchCommission, 30000); // Atualiza a cada 30 seg
+        window.addEventListener('load', fetchCommission);
+    </script>
     <script src="js/admin.js"></script>
     
     <script>
