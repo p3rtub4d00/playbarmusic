@@ -752,3 +752,176 @@ header h1 {
   #action-buttons { position: sticky; bottom: 66px; z-index: 30; padding: 9px 0 2px; background: linear-gradient(180deg, transparent, var(--bg-solid) 35%); }
   #step-2 #action-buttons { margin-top: 10px; }
 }
+
+/* Revisão e pagamento: a ação principal deve ser sempre a mais fácil de tocar. */
+#review-selection-area {
+  margin-top: 16px;
+  text-align: left;
+}
+
+#review-selection-area h2 {
+  color: #fff;
+  font-size: 1.15rem;
+  margin: 0 0 10px;
+  text-align: left;
+}
+
+#reviewSelected {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+#reviewSelected li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  background: #111b19;
+  border: 1px solid #29413b;
+  border-left: 3px solid var(--brand-teal);
+  border-radius: 7px;
+}
+
+.review-song-title {
+  flex: 1;
+  min-width: 0;
+  color: #f4fffa;
+  font-size: 0.93rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.remove-song-btn {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffc4ca;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.remove-song-btn .material-icons-round { font-size: 19px; }
+.remove-song-btn:hover { background: rgba(239, 68, 68, 0.24); color: #fff; }
+
+#step-3 #action-buttons,
+#step-4 #action-buttons {
+  display: grid;
+  grid-template-columns: minmax(48px, 0.38fr) minmax(0, 2.62fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+#step-3 #action-buttons .btn-primary,
+#step-4 #action-buttons .btn-primary {
+  min-height: 58px;
+  font-size: 1.02rem;
+}
+
+.compact-back-btn {
+  min-width: 50px;
+  padding: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.compact-back-btn .material-icons-round { font-size: 22px; }
+.compact-back-label { font-size: 0.72rem; }
+
+.message-modal-content {
+  width: min(92vw, 510px);
+  max-width: 510px;
+  padding: 28px;
+  text-align: left;
+}
+
+.message-modal-content h2 {
+  color: #fff !important;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  text-align: left;
+  text-transform: none !important;
+}
+
+.message-modal-content #modalQuestion {
+  color: #bed0ca;
+  font-size: 1rem;
+  line-height: 1.45;
+  margin: 10px 0 18px;
+}
+
+#modalInitialButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-modal-content .btn-modal {
+  min-height: 54px;
+  margin: 0;
+  border-radius: 7px;
+  font-size: 0.92rem;
+}
+
+.message-modal-content .btn-modal-no {
+  background: #14201e;
+  border-color: #3e5e54;
+  color: #d7e6e0;
+}
+
+#modalMessageInputArea textarea {
+  width: 100%;
+  min-height: 128px;
+  resize: vertical;
+  padding: 14px;
+  color: #f6fffb;
+  background: #08110f;
+  border: 1px solid #426a5d;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+#modalMessageInputArea textarea:focus {
+  outline: none;
+  border-color: var(--brand-teal);
+  box-shadow: 0 0 0 3px rgba(23, 217, 205, 0.13);
+}
+
+.message-input-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 7px 0 14px;
+  color: #9bb0a9;
+  font-size: 0.78rem;
+}
+
+.btn-modal-confirm {
+  background: linear-gradient(100deg, var(--neon-orange), var(--brand-teal));
+  color: #05221d;
+}
+
+@media (max-width: 420px) {
+  #review-selection-area h2 { font-size: 1.05rem; }
+  #reviewSelected li { padding: 10px; }
+  .review-song-title { font-size: 0.88rem; }
+  .compact-back-label { display: none; }
+  #step-3 #action-buttons,
+  #step-4 #action-buttons { grid-template-columns: 52px minmax(0, 1fr); }
+  #step-3 #action-buttons .btn-primary,
+  #step-4 #action-buttons .btn-primary { font-size: 0.94rem; }
+  .message-modal-content { width: min(94vw, 510px); padding: 24px 20px; }
+  .message-modal-content h2 { font-size: 1.35rem; }
+}

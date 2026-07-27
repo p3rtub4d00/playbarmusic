@@ -42,6 +42,7 @@ const modalInitialButtons = document.getElementById('modalInitialButtons');
 const modalMessageInputArea = document.getElementById('modalMessageInputArea');
 const modalMessageText = document.getElementById('modalMessageText');
 const modalBtnConfirm = document.getElementById('modalBtnConfirm');
+const messageCharCount = document.getElementById('messageCharCount');
 const MESSAGE_COST = 1.00;
 
 // Reações
@@ -149,7 +150,7 @@ function updateReviewStep() {
   if (reviewCountText) reviewCountText.textContent = `Quantidade: ${selectedVideos.length}/${selectedPackage.limit}`;
   if (reviewSelected) {
     reviewSelected.innerHTML = selectedVideos
-      .map(v => `<li><span>${v.title}</span> <button onclick="removerVideo('${v.id}')">❌</button></li>`)
+      .map(v => `<li><span class="review-song-title">${v.title}</span><button class="remove-song-btn" type="button" onclick="removerVideo('${v.id}')" aria-label="Remover música"><span class="material-icons-round">close</span></button></li>`)
       .join('');
   }
 }
@@ -429,6 +430,9 @@ if (pagarBtn) {
           modalInitialButtons.style.display = 'flex';
           modalMessageInputArea.style.display = 'none';
           modalMessageText.value = '';
+          if (messageCharCount) messageCharCount.textContent = '0/180';
+          document.getElementById('modalTitle').textContent = 'Quer deixar uma mensagem?';
+          document.getElementById('modalQuestion').textContent = 'Por mais R$ 1,00, sua mensagem aparece na TV antes da música.';
           finalMessage = null;
           finalAmount = selectedPackage.price;
           finalDescription = selectedPackage.description;
@@ -441,14 +445,19 @@ if (modalBtnNo) modalBtnNo.addEventListener('click', () => { messageModal.style.
 if (modalBtnYes) modalBtnYes.addEventListener('click', () => {
       modalInitialButtons.style.display = 'none';
       modalMessageInputArea.style.display = 'block';
+      document.getElementById('modalTitle').textContent = 'Escreva sua mensagem';
+      document.getElementById('modalQuestion').textContent = 'Ela será exibida na TV antes do seu pedido.';
       finalAmount = selectedPackage.price + MESSAGE_COST;
       finalDescription = selectedPackage.description + " + Mensagem";
-      modalBtnConfirm.textContent = `CONFIRMAR (R$ ${finalAmount.toFixed(2).replace('.', ',')})`;
+      modalBtnConfirm.textContent = `IR PARA O PIX - R$ ${finalAmount.toFixed(2).replace('.', ',')}`;
 });
 if (modalBtnConfirm) modalBtnConfirm.addEventListener('click', () => {
       finalMessage = modalMessageText.value.trim();
       messageModal.style.display = 'none';
       proceedToPayment();
+});
+if (modalMessageText) modalMessageText.addEventListener('input', () => {
+    if (messageCharCount) messageCharCount.textContent = `${modalMessageText.value.length}/180`;
 });
 if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => messageModal.style.display = 'none');
 
