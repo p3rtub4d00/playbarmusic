@@ -100,6 +100,11 @@ function safeThumb(url = '') {
   return /^https?:\/\//i.test(value) ? value : '';
 }
 
+function youtubeThumb(videoId = '') {
+  const id = String(videoId || '').trim();
+  return /^[A-Za-z0-9_-]{6,20}$/.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+}
+
 function showToast(message, type = 'info') {
   let background;
   if (type === 'error') background = 'linear-gradient(to right,#9c2842,#d23d59)';
@@ -125,7 +130,7 @@ function renderTrackCard(v, { rail = false, rank = null } = {}) {
   const id = escapeHtml(v?.id || '');
   const title = escapeHtml(v?.title || 'Sem título');
   const channel = escapeHtml(v?.channel || 'YouTube');
-  const thumb = escapeHtml(safeThumb(v?.thumbnail));
+  const thumb = escapeHtml(safeThumb(v?.thumbnail) || youtubeThumb(v?.id));
   const selected = selectedVideos.some(item => item.id === v?.id);
   const data = [
     `data-id="${id}"`,
