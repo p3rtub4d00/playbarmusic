@@ -53,10 +53,17 @@ a{color:inherit;text-decoration:none}
   backdrop-filter:blur(18px);
 }
 .brand{display:flex;align-items:center;min-width:0}
-.brand-logo{
-  width:118px;height:auto;display:block;border-radius:13px;
-  box-shadow:0 0 26px #a13cff26,0 0 22px #20d9e31a;
+.brand-copy{display:grid;gap:2px;min-width:0}
+.brand-copy strong{
+  font-size:18px;font-weight:900;letter-spacing:.5px;line-height:1;
+  background:linear-gradient(90deg,#ffffff 0%,#d8b7ff 48%,#65e9ef 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
 }
+.brand-copy strong span{
+  background:linear-gradient(90deg,#b84fff,#36dce6);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.brand-copy small{color:var(--muted);font-size:9px;font-weight:600;white-space:nowrap}
 .live-pill{
   border:1px solid #55f07b38;
   background:#55f07b0f;
@@ -515,7 +522,8 @@ footer strong{color:#9f91aa}
 @media(max-width:480px){
   body{padding-bottom:88px}
   .topbar{min-height:69px}
-  .brand-logo{width:104px;border-radius:11px}
+  .brand-copy strong{font-size:16px}
+  .brand-copy small{font-size:8px}
   .live-pill{font-size:7px;padding:6px 8px}
   .hero{grid-template-columns:1fr 92px;min-height:194px;padding:20px 15px}
   .hero h1{font-size:26px;letter-spacing:-1.2px}
