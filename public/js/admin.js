@@ -435,3 +435,105 @@ socket.on('admin:playHistory', (history) => {
   }).join('');
 });
 
+
+
+// --- Navegação mobile em tela cheia ---
+(() => {
+  const MOBILE_ADMIN_BREAKPOINT = 820;
+  const modal = document.getElementById('adminSectionModal');
+  const modalBody = document.getElementById('adminSectionModalBody');
+  const modalTitle = document.getElementById('adminSectionModalTitle');
+  const closeBtn = document.getElementById('adminSectionModalClose');
+  const navLinks = Array.from(document.querySelectorAll('.sidebar .nav-link'));
+
+  if (!modal || !modalBody || !modalTitle || !closeBtn || navLinks.length === 0) return;
+
+  const titles = {
+    player: 'Controle do Player',
+    queue: 'Fila & Buscas',
+    autoplay: 'Inatividade (Autoplay)',
+    settings: 'Configurações'
+  };
+
+  const hrefToGroup = {
+    '#player-section': 'player',
+    '#queue-section': 'queue',
+    '#autoplay-section': 'autoplay',
+    '#settings-section': 'settings'
+  };
+
+  let movedCards = [];
+  let pageScrollY = 0;
+
+  const isMobileAdmin = () => window.innerWidth <= MOBILE_ADMIN_BREAKPOINT;
+
+  function setActiveNav(link) {
+    document.querySelectorAll('.sidebar .nav-item').forEach(item => item.classList.remove('active'));
+    link?.closest('.nav-item')?.classList.add('active');
+  }
+
+  function restoreCards() {
+    for (const item of movedCards) {
+      if (!item.card || !item.placeholder?.parentNode) continue;
+      item.placeholder.parentNode.insertBefore(item.card, item.placeholder);
+      item.placeholder.remove();
+    }
+    movedCards = [];
+  }
+
+  function closeAdminModal({ restoreScroll = true } = {}) {
+    if (!modal.classList.contains('open')) return;
+    restoreCards();
+    modalBody.innerHTML = '';
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('admin-modal-open');
+    if (restoreScroll) window.scrollTo(0, pageScrollY);
+  }
+
+  function openAdminModal(group, sourceLink) {
+    const cards = Array.from(document.querySelectorAll(`[data-admin-group="${group}"]`));
+    if (!cards.length) return;
+
+    closeAdminModal({ restoreScroll: false });
+    pageScrollY = window.scrollY;
+    modalTitle.textContent = titles[group] || 'Painel Administrativo';
+    setActiveNav(sourceLink);
+
+    movedCards = cards.map(card => {
+      const placeholder = document.createComment(`admin-modal-${group}`);
+      card.parentNode.insertBefore(placeholder, card);
+      modalBody.appendChild(card);
+      return { card, placeholder };
+    });
+
+    modalBody.scrollTop = 0;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('admin-modal-open');
+    closeBtn.focus({ preventScroll: true });
+  }
+
+  navLinks.forEach(link => {
+    link.addEventListener('click', event => {
+      const group = hrefToGroup[link.getAttribute('href')];
+      if (!group || !isMobileAdmin()) return;
+      event.preventDefault();
+      openAdminModal(group, link);
+    });
+  });
+
+  closeBtn.addEventListener('click', () => closeAdminModal());
+
+  modal.addEventListener('click', event => {
+    if (event.target === modal) closeAdminModal();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && modal.classList.contains('open')) closeAdminModal();
+  });
+
+  window.addEventListener('resize', () => {
+    if (!isMobileAdmin() && modal.classList.contains('open')) closeAdminModal({ restoreScroll: false });
+  });
+})();
