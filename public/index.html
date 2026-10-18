@@ -175,15 +175,17 @@
             <div id="results" class="track-list"></div>
           </div>
 
-          <div id="selection-area" class="selection-card">
+          <div id="selection-area" class="selection-card compact">
             <div class="selection-head">
               <div>
                 <span class="eyebrow">SEU PEDIDO</span>
                 <strong><span id="selectionCountLabel">0</span> músicas selecionadas</strong>
               </div>
-              <span class="material-icons-round">shopping_bag</span>
+              <button id="toggleSelectionBtn" class="selection-toggle" type="button" aria-expanded="false">
+                <span class="material-icons-round">expand_more</span><span>Ver lista</span>
+              </button>
             </div>
-            <ul id="selected"></ul>
+            <ul id="selected" class="selection-list collapsed"></ul>
             <div class="step-actions">
               <button id="backToStep1Btn" class="btn-secondary" type="button"><span class="material-icons-round">arrow_back</span> Pacote</button>
               <button id="toStep3Btn" class="btn-primary" type="button" disabled>Revisar pedido <span class="material-icons-round">arrow_forward</span></button>
