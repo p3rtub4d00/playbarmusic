@@ -1,4 +1,4 @@
-const CACHE_NAME = 'playbar-v7';
+const CACHE_NAME = 'playbar-v8';
 const urlsToCache = [
   '/admin.html',
   '/css/admin.css',
