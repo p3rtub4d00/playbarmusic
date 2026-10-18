@@ -509,6 +509,82 @@ app.get("/user-history", async (req, res) => {
     }
 });
 
+app.get("/discover", async (req, res) => {
+  try {
+    const popular = await PaymentModel.aggregate([
+      { $match: { status: 'approved' } },
+      { $unwind: '$videos' },
+      { $match: { 'videos.id': { $type: 'string', $ne: '' } } },
+      {
+        $group: {
+          _id: '$videos.id',
+          title: { $last: '$videos.title' },
+          channel: { $last: '$videos.channel' },
+          thumbnail: { $last: '$videos.thumbnail' },
+          requests: { $sum: 1 },
+          lastRequestedAt: { $max: '$createdAt' }
+        }
+      },
+      { $sort: { requests: -1, lastRequestedAt: -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 0,
+          id: '$_id',
+          title: 1,
+          channel: 1,
+          thumbnail: 1,
+          requests: 1
+        }
+      }
+    ]);
+
+    const seen = new Set(popular.map(item => item.id));
+    const results = [...popular];
+
+    // Se o estabelecimento ainda não tiver histórico suficiente, completa a vitrine
+    // com sugestões de busca. Isso não interfere na fila nem no player da TV.
+    if (results.length < 8) {
+      const fallbackTerm = 'músicas mais tocadas brasil 2026';
+      let fallback = await SearchCacheModel.findOne({ term: fallbackTerm }).lean();
+
+      if (!fallback) {
+        const search = await youtubeSearchApi.GetListByKeyword(fallbackTerm, false, 10);
+        const items = [];
+        for (const item of search.items || []) {
+          if (item.id && item.title && !(await isTitleBlocked(item.title))) {
+            items.push({
+              id: item.id,
+              title: item.title,
+              channel: item.channel?.name || 'YouTube',
+              thumbnail: item.thumbnail?.thumbnails?.[0]?.url || ''
+            });
+          }
+        }
+        if (items.length) {
+          try {
+            fallback = await SearchCacheModel.create({ term: fallbackTerm, results: items });
+          } catch {
+            fallback = { results: items };
+          }
+        }
+      }
+
+      for (const item of fallback?.results || []) {
+        if (!item?.id || seen.has(item.id)) continue;
+        seen.add(item.id);
+        results.push(item);
+        if (results.length >= 10) break;
+      }
+    }
+
+    res.json({ ok: true, results });
+  } catch (err) {
+    console.error('[Discover] Erro ao montar sugestões:', err);
+    res.json({ ok: true, results: [] });
+  }
+});
+
 app.get("/search", async (req, res) => {
   try {
     const query = req.query.q;
@@ -734,12 +810,7 @@ io.on("connection", async (socket) => {
   socket.on('player:ping', () => {
     socket.emit('player:pong', { ts: Date.now() });
   });
-
-  socket.on('reaction', (emoji) => {
-      io.emit('player:showReaction', emoji);
-  });
-
-  socket.on('admin:getList', async () => {
+socket.on('admin:getList', async () => {
     try {
         const [freshConfig, inactivityList, queue, playHistory] = await Promise.all([
             getConfig(),
