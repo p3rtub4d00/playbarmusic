@@ -192,14 +192,22 @@ function goToStep(step, { scroll = true } = {}) {
   wizardScreens.forEach((screen, index) => {
     screen.style.display = index + 1 === step ? 'block' : 'none';
   });
+
+  const wizardProgress = $('wizard-progress');
+  if (wizardProgress) {
+    wizardProgress.classList.toggle('hidden', step === 1);
+  }
+
   wizardStepBadges.forEach((badge) => {
     const badgeStep = Number(badge.dataset.step);
     badge.classList.toggle('active', badgeStep === step);
   });
+
   if (progressFill) {
-    const widths = { 1: 10, 2: 30, 3: 52, 4: 76, 5: 100 };
-    progressFill.style.width = `${widths[step] || 10}%`;
+    const widths = { 2: 25, 3: 50, 4: 75, 5: 100 };
+    progressFill.style.width = `${widths[step] || 25}%`;
   }
+
   if (step === 2) loadDiscover();
   if (scroll) scrollTopSoft();
 }
