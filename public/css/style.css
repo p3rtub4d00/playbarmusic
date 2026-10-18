@@ -52,18 +52,11 @@ a{color:inherit;text-decoration:none}
   background:linear-gradient(180deg,#090611f5 0%,#090611d8 72%,transparent 100%);
   backdrop-filter:blur(18px);
 }
-.brand{display:flex;align-items:center;gap:11px;min-width:0}
-.brand-mark{
-  width:46px;height:46px;border-radius:15px;display:grid;place-items:center;overflow:hidden;
-  background:linear-gradient(145deg,#201131,#0c0a12);
-  border:1px solid #ffffff18;
-  box-shadow:0 0 24px #913cff28;
+.brand{display:flex;align-items:center;min-width:0}
+.brand-logo{
+  width:118px;height:auto;display:block;border-radius:13px;
+  box-shadow:0 0 26px #a13cff26,0 0 22px #20d9e31a;
 }
-.brand-mark img{width:40px;height:40px;object-fit:contain}
-.brand-copy{display:grid;gap:2px;min-width:0}
-.brand-copy strong{font-size:18px;font-weight:900;letter-spacing:.5px}
-.brand-copy strong span{color:var(--cyan)}
-.brand-copy small{color:var(--muted);font-size:9px;font-weight:600;white-space:nowrap}
 .live-pill{
   border:1px solid #55f07b38;
   background:#55f07b0f;
@@ -443,8 +436,10 @@ a{color:inherit;text-decoration:none}
 .spinner{width:16px;height:16px;border:2px solid #ffffff16;border-top-color:#b24aff;border-radius:50%;animation:spinner .7s linear infinite}
 @keyframes spinner{to{transform:rotate(360deg)}}
 
-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;color:#5f5666;padding:25px 4px 14px;font-size:8px}
-footer strong{color:#756a7d}
+footer{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;color:#5f5666;padding:25px 4px 14px;font-size:8px}
+footer strong{color:#9f91aa}
+.footer-brand{display:grid;gap:4px;text-align:left}
+.footer-brand span{font-size:7px;color:#5f5666}
 
 .bottom-nav{
   position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);
@@ -487,15 +482,15 @@ footer strong{color:#756a7d}
 .install-invite{
   position:fixed;z-index:120;top:12px;left:50%;transform:translateX(-50%);
   width:min(520px,calc(100% - 24px));
-  display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:11px;
+  display:grid;grid-template-columns:70px minmax(0,1fr) auto;align-items:center;gap:11px;
   border:1px solid #a44cff5c;border-radius:19px;
   background:#17101fea;backdrop-filter:blur(24px);padding:11px;
   box-shadow:0 20px 70px #000b,0 0 35px #913eff1f;
   animation:inviteIn .22s ease-out;
 }
 @keyframes inviteIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
-.install-icon{width:48px;height:48px;border-radius:14px;background:#09070d;display:grid;place-items:center;overflow:hidden}
-.install-icon img{width:42px;height:42px;object-fit:contain}
+.install-icon{width:70px;height:48px;border-radius:14px;background:#09070d;display:grid;place-items:center;overflow:hidden}
+.install-icon img{width:66px;height:44px;object-fit:contain}
 .install-copy{display:grid;gap:3px;min-width:0}
 .install-copy strong{font-size:11px}
 .install-copy span{font-size:8px;color:#9e92a7}
@@ -520,10 +515,7 @@ footer strong{color:#756a7d}
 @media(max-width:480px){
   body{padding-bottom:88px}
   .topbar{min-height:69px}
-  .brand-mark{width:40px;height:40px;border-radius:13px}
-  .brand-mark img{width:35px;height:35px}
-  .brand-copy strong{font-size:15px}
-  .brand-copy small{font-size:7px}
+  .brand-logo{width:104px;border-radius:11px}
   .live-pill{font-size:7px;padding:6px 8px}
   .hero{grid-template-columns:1fr 92px;min-height:194px;padding:20px 15px}
   .hero h1{font-size:26px;letter-spacing:-1.2px}
@@ -549,8 +541,9 @@ footer strong{color:#756a7d}
   .rail-card{width:142px}
   .order-summary{gap:6px}
   .order-summary>div{padding:8px}
-  .install-invite{grid-template-columns:42px minmax(0,1fr);top:8px}
-  .install-icon{width:42px;height:42px}
+  .install-invite{grid-template-columns:64px minmax(0,1fr);top:8px}
+  .install-icon{width:64px;height:44px}
+  .install-icon img{width:60px;height:40px}
   .install-actions{grid-column:1/-1;justify-content:flex-end}
 }
 @media(max-width:360px){
