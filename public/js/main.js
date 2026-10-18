@@ -9,6 +9,7 @@ const selectedList = $('selected');
 const countSpan = $('count');
 const limitSpan = $('limit');
 const selectionCountLabel = $('selectionCountLabel');
+const toggleSelectionBtn = $('toggleSelectionBtn');
 const pagarBtn = $('pagarBtn');
 const pixArea = $('pixArea');
 const pixTitle = $('pixTitle');
@@ -264,6 +265,15 @@ function atualizarLista() {
   if (countSpan) countSpan.textContent = String(selectedVideos.length);
   if (selectionCountLabel) selectionCountLabel.textContent = String(selectedVideos.length);
   if (toStep3Btn) toStep3Btn.disabled = selectedVideos.length !== selectedPackage.limit;
+  if (toggleSelectionBtn) {
+    toggleSelectionBtn.disabled = selectedVideos.length === 0;
+    if (selectedVideos.length === 0) {
+      selectedList?.classList.remove('expanded');
+      selectedList?.classList.add('collapsed');
+      toggleSelectionBtn.setAttribute('aria-expanded', 'false');
+      toggleSelectionBtn.innerHTML = '<span class="material-icons-round">expand_more</span><span>Ver lista</span>';
+    }
+  }
   updatePaymentButtonText();
 }
 
@@ -450,6 +460,17 @@ function startPaymentStatusPolling() {
 }
 
 // --- Eventos da interface ---
+toggleSelectionBtn?.addEventListener('click', () => {
+  if (!selectedList || selectedVideos.length === 0) return;
+  const expanded = !selectedList.classList.contains('expanded');
+  selectedList.classList.toggle('expanded', expanded);
+  selectedList.classList.toggle('collapsed', !expanded);
+  toggleSelectionBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  toggleSelectionBtn.innerHTML = expanded
+    ? '<span class="material-icons-round">expand_more</span><span>Ocultar</span>'
+    : '<span class="material-icons-round">expand_more</span><span>Ver lista</span>';
+});
+
 searchBtn?.addEventListener('click', () => buscarVideos());
 searchInput?.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') buscarVideos();
