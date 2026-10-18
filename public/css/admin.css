@@ -50,7 +50,13 @@ ul { list-style: none; }
     text-align: center;
 }
 
-.logo-img { max-width: 180px; }
+.logo-img {
+    width: 100%;
+    max-width: 205px;
+    height: auto;
+    border-radius: 14px;
+    filter: drop-shadow(0 0 16px rgba(168,85,247,.28)) drop-shadow(0 0 12px rgba(34,211,238,.18));
+}
 
 .sidebar-nav { padding: 24px 0; flex-grow: 1; }
 
