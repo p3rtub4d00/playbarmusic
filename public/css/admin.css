@@ -516,7 +516,6 @@ ul { list-style: none; }
 
 body.admin-modal-open{
   overflow:hidden;
-  touch-action:none;
 }
 
 @media (min-width:821px){
