@@ -91,7 +91,7 @@
                 <div class="column">
                     
                     <!-- Card: Controle do Player -->
-                    <section class="card" id="player-section">
+                    <section class="card" id="player-section" data-admin-group="player">
                         <div class="card-header">
                             <h2><i class="fa-solid fa-compact-disc"></i> Player Principal</h2>
                         </div>
@@ -116,7 +116,7 @@
                     </section>
 
                     <!-- Card: Fila de Reprodução -->
-                    <section class="card" id="queue-section">
+                    <section class="card" id="queue-section" data-admin-group="queue">
                         <div class="card-header">
                             <h2><i class="fa-solid fa-list-ol"></i> Próximos na Fila</h2>
                         </div>
@@ -158,7 +158,7 @@
                 <div class="column">
                     
                     <!-- Card: Autoplay / Inatividade -->
-                    <section class="card" id="autoplay-section">
+                    <section class="card" id="autoplay-section" data-admin-group="autoplay">
                         <div class="card-header">
                             <h2><i class="fa-solid fa-robot"></i> Inteligência de Inatividade (Autoplay)</h2>
                         </div>
@@ -205,7 +205,7 @@
                     </section>
 
                     <!-- Card: Filtro de Músicas / Palavras Proibidas -->
-                    <section class="card" id="filter-section">
+                    <section class="card" id="filter-section" data-admin-group="settings">
                         <div class="card-header">
                             <h2><i class="fa-solid fa-ban"></i> Filtro de Conteúdo (Bloqueios)</h2>
                         </div>
@@ -225,7 +225,7 @@
                     </section>
 
                     <!-- Card: Configurações do Sistema -->
-                    <section class="card" id="settings-section">
+                    <section class="card" id="settings-section" data-admin-group="settings">
                         <div class="card-header">
                             <h2><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2>
                         </div>
@@ -267,6 +267,21 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <div id="adminSectionModal" class="admin-section-modal" aria-hidden="true">
+        <div class="admin-section-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminSectionModalTitle">
+            <header class="admin-section-modal-header">
+                <button id="adminSectionModalClose" class="admin-section-modal-close" type="button" aria-label="Fechar">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <div>
+                    <small>PAINEL ADMINISTRATIVO</small>
+                    <h2 id="adminSectionModalTitle">Seção</h2>
+                </div>
+            </header>
+            <div id="adminSectionModalBody" class="admin-section-modal-body"></div>
+        </div>
     </div>
 
     <!-- Scripts do Sistema -->
