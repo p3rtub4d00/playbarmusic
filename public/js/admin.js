@@ -64,6 +64,60 @@ function formatCurrency(value) {
     return Number(value || 0).toFixed(2).replace('.', ',');
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function renderAdminPlayerState(state = {}) {
+    const nowPlaying = state.nowPlaying || null;
+    if (adminNowPlayingSpan) {
+        if (nowPlaying) {
+            adminNowPlayingSpan.textContent = nowPlaying.title + (!nowPlaying.isCustomer ? ' (Lista da Casa)' : '');
+            if (adminNowPlayingMessageSpan) {
+                if (nowPlaying.message) {
+                    adminNowPlayingMessageSpan.textContent = `"${nowPlaying.message}"`;
+                    adminNowPlayingMessageSpan.style.display = 'block';
+                } else {
+                    adminNowPlayingMessageSpan.style.display = 'none';
+                }
+            }
+        } else {
+            adminNowPlayingSpan.textContent = 'Nenhuma música tocando...';
+            if (adminNowPlayingMessageSpan) adminNowPlayingMessageSpan.style.display = 'none';
+        }
+    }
+
+    const dashNowPlaying = document.getElementById('dashNowPlaying');
+    if (dashNowPlaying) dashNowPlaying.textContent = nowPlaying?.title || 'Nenhuma música tocando';
+
+    if (adminQueueList) {
+        if (Array.isArray(state.queue) && state.queue.length > 0) {
+            adminQueueList.innerHTML = state.queue.map((video, index) => {
+                const source = video.isCustomer ? 'Cliente' : 'Casa';
+                const message = video.message ? ` • "${escapeHtml(video.message)}"` : '';
+                return `<li class="queue-admin-item">
+                    <div class="queue-admin-copy">
+                        <strong>${String(index + 1).padStart(2, '0')} • ${escapeHtml(video.title || 'Sem título')}</strong>
+                        <small>${source}${message}</small>
+                    </div>
+                    ${video.queueId ? `<div class="queue-admin-actions">
+                        <button class="queue-action-btn next" type="button" data-queue-next="${escapeHtml(video.queueId)}" title="Tocar como próxima"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button class="queue-action-btn remove" type="button" data-queue-remove="${escapeHtml(video.queueId)}" title="Remover da fila"><i class="fa-solid fa-trash"></i></button>
+                    </div>` : ''}
+                </li>`;
+            }).join('');
+        } else {
+            adminQueueList.innerHTML = '<li>(Fila vazia)</li>';
+        }
+    }
+}
+
+
 async function loadCommission() {
     if (!commissionAmountSpan || !commissionPercentSpan) return;
     try {
@@ -387,36 +441,29 @@ socket.on('admin:updateMaxPlaybackMinutes', (minutes) => {
   if (maxPlaybackMinutesInput) maxPlaybackMinutesInput.value = minutes;
 });
 
-socket.on('updatePlayerState', (state) => {
-  if (adminNowPlayingSpan) {
-      if (state.nowPlaying) {
-        adminNowPlayingSpan.textContent = state.nowPlaying.title + (!state.nowPlaying.isCustomer ? ' (Lista da Casa)' : '');
-        if (adminNowPlayingMessageSpan) {
-            if (state.nowPlaying.message) {
-              adminNowPlayingMessageSpan.textContent = `"${state.nowPlaying.message}"`;
-              adminNowPlayingMessageSpan.style.display = 'block';
-            } else {
-              adminNowPlayingMessageSpan.style.display = 'none';
-            }
-        }
-      } else {
-        adminNowPlayingSpan.textContent = 'Nenhuma música tocando...';
-        if(adminNowPlayingMessageSpan) adminNowPlayingMessageSpan.style.display = 'none';
-      }
-  }
+socket.on('updatePlayerState', renderAdminPlayerState);
+socket.on('admin:updatePlayerState', renderAdminPlayerState);
 
-  if (adminQueueList) {
-      if (state.queue && state.queue.length > 0) {
-        adminQueueList.innerHTML = state.queue.map(video => {
-          let title = video.title + (!video.isCustomer ? ' (Lista da Casa)' : '');
-          if (video.message) title += ` <span class="queue-message">"${video.message}"</span>`;
-          return `<li>${title}</li>`;
-        }).join('');
-      } else {
-        adminQueueList.innerHTML = '<li>(Fila vazia)</li>';
-      }
-  }
-});
+if (adminQueueList) {
+  adminQueueList.addEventListener('click', (event) => {
+    const nextBtn = event.target.closest('[data-queue-next]');
+    const removeBtn = event.target.closest('[data-queue-remove]');
+
+    if (nextBtn) {
+      socket.emit('admin:queueNext', nextBtn.dataset.queueNext, (result) => {
+        showToast(result?.ok ? 'Música movida para a próxima posição.' : (result?.error || 'Não foi possível reordenar a fila.'), result?.ok ? 'success' : 'error');
+      });
+      return;
+    }
+
+    if (removeBtn) {
+      if (!confirm('Remover esta música da fila?')) return;
+      socket.emit('admin:queueRemove', removeBtn.dataset.queueRemove, (result) => {
+        showToast(result?.ok ? 'Música removida da fila.' : (result?.error || 'Não foi possível remover a música.'), result?.ok ? 'success' : 'error');
+      });
+    }
+  });
+}
 
 socket.on('admin:loadPromoText', (text) => {
   if (promoTextInput) promoTextInput.value = text;
@@ -449,6 +496,7 @@ socket.on('admin:playHistory', (history) => {
   if (!modal || !modalBody || !modalTitle || !closeBtn || navLinks.length === 0) return;
 
   const titles = {
+    dashboard: 'Visão Geral',
     player: 'Controle do Player',
     queue: 'Fila & Buscas',
     autoplay: 'Inatividade (Autoplay)',
@@ -456,6 +504,7 @@ socket.on('admin:playHistory', (history) => {
   };
 
   const hrefToGroup = {
+    '#dashboard-section': 'dashboard',
     '#player-section': 'player',
     '#queue-section': 'queue',
     '#autoplay-section': 'autoplay',
@@ -676,4 +725,306 @@ socket.on('admin:playHistory', (history) => {
   }
 
   loadStatus();
+})();
+
+
+// --- Operação comercial do cliente ---
+(() => {
+  const p1Limit = document.getElementById('package1Limit');
+  const p1Price = document.getElementById('package1Price');
+  const p2Limit = document.getElementById('package2Limit');
+  const p2Price = document.getElementById('package2Price');
+  const messageCost = document.getElementById('messageCostInput');
+  const saveBtn = document.getElementById('saveCustomerConfigBtn');
+  const toggleBtn = document.getElementById('settingsToggleOrdersBtn');
+  const badge = document.getElementById('ordersSettingsBadge');
+  const dashToggle = document.getElementById('toggleOrdersBtn');
+  const dashBadge = document.getElementById('ordersModeBadge');
+
+  let ordersEnabled = true;
+
+  function renderOrdersState(enabled) {
+    ordersEnabled = enabled !== false;
+    const activeText = ordersEnabled ? 'Pedidos ativos' : 'Pedidos pausados';
+
+    if (badge) {
+      badge.textContent = activeText;
+      badge.className = 'mp-status-badge ' + (ordersEnabled ? 'is-connected' : 'is-warning');
+    }
+    if (dashBadge) {
+      dashBadge.textContent = ordersEnabled ? 'ATIVO' : 'PAUSADO';
+      dashBadge.className = 'status-pill ' + (ordersEnabled ? 'ok' : 'warn');
+    }
+    if (toggleBtn) {
+      toggleBtn.innerHTML = ordersEnabled
+        ? '<i class="fa-solid fa-pause"></i> Pausar pedidos'
+        : '<i class="fa-solid fa-play"></i> Reabrir pedidos';
+    }
+    if (dashToggle) {
+      dashToggle.innerHTML = ordersEnabled
+        ? '<i class="fa-solid fa-pause"></i> Pausar novos pedidos'
+        : '<i class="fa-solid fa-play"></i> Reabrir pedidos';
+      dashToggle.classList.toggle('btn-primary', !ordersEnabled);
+      dashToggle.classList.toggle('btn-secondary', ordersEnabled);
+    }
+  }
+
+  function toggleOrders() {
+    const next = !ordersEnabled;
+    const message = next
+      ? 'Reabrir os pedidos pagos para os clientes?'
+      : 'Pausar novos pedidos? O player e o telão continuarão funcionando normalmente.';
+    if (!confirm(message)) return;
+
+    socket.emit('admin:setOrdersEnabled', next, (result) => {
+      if (!result?.ok) return showToast('Não foi possível alterar o recebimento de pedidos.', 'error');
+      renderOrdersState(result.ordersEnabled);
+      showToast(result.ordersEnabled ? 'Pedidos reabertos.' : 'Novos pedidos pausados.', 'success');
+      window.dispatchEvent(new Event('playbar:dashboard-refresh'));
+    });
+  }
+
+  socket.on('admin:loadCustomerConfig', (config = {}) => {
+    if (p1Limit) p1Limit.value = config.package1Limit ?? 3;
+    if (p1Price) p1Price.value = Number(config.package1Price ?? 2).toFixed(2);
+    if (p2Limit) p2Limit.value = config.package2Limit ?? 5;
+    if (p2Price) p2Price.value = Number(config.package2Price ?? 3).toFixed(2);
+    if (messageCost) messageCost.value = Number(config.messageCost ?? 1).toFixed(2);
+    renderOrdersState(config.ordersEnabled !== false);
+  });
+
+  saveBtn?.addEventListener('click', () => {
+    const payload = {
+      package1Limit: Number(p1Limit?.value),
+      package1Price: Number(p1Price?.value),
+      package2Limit: Number(p2Limit?.value),
+      package2Price: Number(p2Price?.value),
+      messageCost: Number(messageCost?.value),
+      ordersEnabled
+    };
+
+    saveBtn.disabled = true;
+    socket.emit('admin:saveCustomerConfig', payload, (result) => {
+      saveBtn.disabled = false;
+      if (!result?.ok) return showToast(result?.error || 'Erro ao salvar preços.', 'error');
+      showToast('Pacotes e preços atualizados.', 'success');
+      window.dispatchEvent(new Event('playbar:dashboard-refresh'));
+    });
+  });
+
+  toggleBtn?.addEventListener('click', toggleOrders);
+  dashToggle?.addEventListener('click', toggleOrders);
+})();
+
+
+// --- Dashboard operacional ---
+(() => {
+  const queueCount = document.getElementById('dashQueueCount');
+  const ordersToday = document.getElementById('dashOrdersToday');
+  const revenueToday = document.getElementById('dashRevenueToday');
+  const pending = document.getElementById('dashPendingPayments');
+  const playerBadge = document.getElementById('dashPlayerBadge');
+  const statusPlayer = document.getElementById('statusPlayer');
+  const statusMp = document.getElementById('statusMp');
+  const statusQG = document.getElementById('statusQG');
+  const refreshBtn = document.getElementById('dashRefreshBtn');
+  const financeBody = document.getElementById('financeTableBody');
+  const financeTotal = document.getElementById('financeTotal');
+  const financeCount = document.getElementById('financeCount');
+  const financeFilters = Array.from(document.querySelectorAll('.finance-filter'));
+  let financeDays = 1;
+
+  function setStatus(el, state, label) {
+    if (!el) return;
+    el.className = 'status-dot-label ' + state;
+    el.innerHTML = '<i></i>' + label;
+  }
+
+  function renderOnboarding(onboarding = {}) {
+    const keys = ['mercadoPago', 'prices', 'screen', 'firstOrder'];
+    let done = 0;
+    keys.forEach(key => {
+      const el = document.querySelector(`.onboarding-step[data-check="${key}"]`);
+      const ok = onboarding[key] === true;
+      if (ok) done += 1;
+      el?.classList.toggle('done', ok);
+    });
+    const progress = document.getElementById('onboardingProgress');
+    if (progress) progress.textContent = `${done}/4`;
+  }
+
+  async function loadDashboard() {
+    try {
+      const response = await fetch('/api/admin/dashboard', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Falha no dashboard');
+
+      if (queueCount) queueCount.textContent = data.queueCount ?? 0;
+      if (ordersToday) ordersToday.textContent = data.ordersToday ?? 0;
+      if (revenueToday) revenueToday.textContent = formatCurrency(data.revenueToday);
+      if (pending) pending.textContent = data.pendingPayments ?? 0;
+      const dashNowPlaying = document.getElementById('dashNowPlaying');
+      if (dashNowPlaying) dashNowPlaying.textContent = data.nowPlaying?.title || 'Nenhuma música tocando';
+
+      if (playerBadge) {
+        playerBadge.textContent = data.playerOnline ? 'TELÃO ONLINE' : 'TELÃO OFFLINE';
+        playerBadge.className = 'status-pill ' + (data.playerOnline ? 'ok' : 'bad');
+      }
+      setStatus(statusPlayer, data.playerOnline ? 'ok' : 'bad', data.playerOnline ? 'Online' : 'Offline');
+      setStatus(statusMp, data.mercadoPago?.connected ? 'ok' : 'bad', data.mercadoPago?.connected ? 'Conectado' : 'Desconectado');
+
+      if (!data.qg?.configured) setStatus(statusQG, 'warn', 'Não configurado');
+      else setStatus(statusQG, data.qg?.online ? 'ok' : 'bad', data.qg?.online ? (data.qg.demo ? 'Demo' : 'Online') : 'Offline');
+
+      renderOnboarding(data.onboarding);
+    } catch (error) {
+      setStatus(statusPlayer, 'warn', 'Indisponível');
+      setStatus(statusMp, 'warn', 'Indisponível');
+      setStatus(statusQG, 'warn', 'Indisponível');
+    }
+  }
+
+  async function loadPayments() {
+    if (!financeBody) return;
+    financeBody.innerHTML = '<tr><td colspan="4">Carregando...</td></tr>';
+    try {
+      const response = await fetch(`/api/admin/payments?days=${financeDays}`, { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Falha no histórico');
+
+      if (financeTotal) financeTotal.textContent = formatCurrency(data.totalApproved);
+      if (financeCount) financeCount.textContent = `${data.approvedCount || 0} pedido${data.approvedCount === 1 ? '' : 's'}`;
+
+      if (!data.payments?.length) {
+        financeBody.innerHTML = '<tr><td colspan="4">Nenhum pagamento neste período.</td></tr>';
+        return;
+      }
+
+      financeBody.innerHTML = data.payments.map(item => {
+        const date = new Date(item.createdAt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const label = item.status === 'approved' ? 'Aprovado' : item.status === 'pending' ? 'Pendente' : item.status;
+        const statusClass = item.status === 'approved' ? 'approved' : item.status === 'pending' ? 'pending' : 'other';
+        const description = item.description || `${item.tracks || 0} música(s)`;
+        return `<tr>
+          <td>${escapeHtml(date)}</td>
+          <td><strong>${escapeHtml(description)}</strong><br><small>${escapeHtml(item.phone || 'Sem telefone')}</small></td>
+          <td>R$ ${formatCurrency(item.amount)}</td>
+          <td><span class="finance-status ${statusClass}">${escapeHtml(label)}</span></td>
+        </tr>`;
+      }).join('');
+    } catch {
+      financeBody.innerHTML = '<tr><td colspan="4">Não foi possível carregar o histórico.</td></tr>';
+    }
+  }
+
+  refreshBtn?.addEventListener('click', () => { loadDashboard(); loadPayments(); });
+  financeFilters.forEach(btn => btn.addEventListener('click', () => {
+    financeFilters.forEach(item => item.classList.remove('active'));
+    btn.classList.add('active');
+    financeDays = Number(btn.dataset.days) || 1;
+    loadPayments();
+  }));
+
+  document.getElementById('dashPauseBtn')?.addEventListener('click', () => socket.emit('admin:controlPause'));
+  document.getElementById('dashSkipBtn')?.addEventListener('click', () => socket.emit('admin:controlSkip'));
+  document.getElementById('dashOpenPlayerBtn')?.addEventListener('click', () => window.open('/player.html', '_blank', 'noopener'));
+  document.getElementById('dashOpenCustomerBtn')?.addEventListener('click', () => window.open('/', '_blank', 'noopener'));
+
+  window.addEventListener('playbar:dashboard-refresh', () => { loadDashboard(); loadPayments(); });
+  socket.on('updatePlayerState', () => loadDashboard());
+  socket.on('admin:updateRevenue', () => loadDashboard());
+
+  loadDashboard();
+  loadPayments();
+  setInterval(loadDashboard, 15000);
+})();
+
+
+// --- QR Code do cliente ---
+(() => {
+  const qrEl = document.getElementById('adminQrCode');
+  const urlEl = document.getElementById('adminQrUrl');
+  const copyBtn = document.getElementById('copyCustomerUrlBtn');
+  const printBtn = document.getElementById('printQrBtn');
+  if (!qrEl) return;
+
+  const customerUrl = window.location.origin + '/';
+  if (urlEl) urlEl.textContent = customerUrl;
+
+  if (window.QRCode) {
+    qrEl.innerHTML = '';
+    new QRCode(qrEl, {
+      text: customerUrl,
+      width: 136,
+      height: 136,
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  } else {
+    qrEl.textContent = 'QR indisponível';
+  }
+
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(customerUrl);
+      showToast('Link do cliente copiado.', 'success');
+    } catch {
+      showToast('Não foi possível copiar o link.', 'error');
+    }
+  });
+
+  printBtn?.addEventListener('click', () => {
+    const image = qrEl.querySelector('img')?.src || qrEl.querySelector('canvas')?.toDataURL?.('image/png');
+    if (!image) return showToast('QR Code ainda não está pronto.', 'error');
+    const popup = window.open('', '_blank', 'width=520,height=620');
+    if (!popup) return showToast('Permita pop-ups para imprimir o QR Code.', 'error');
+    popup.document.write(`<!doctype html><html><head><title>QR Code PlayBar</title><style>body{font-family:Arial;text-align:center;padding:40px}img{width:320px;height:320px}h1{margin-bottom:6px}p{color:#555}</style></head><body><h1>PlayBar Music</h1><p>Escaneie e escolha sua música</p><img src="${image}" alt="QR Code"><p>${customerUrl}</p><script>window.onload=()=>window.print()<\/script></body></html>`);
+    popup.document.close();
+  });
+})();
+
+
+// --- PWA exclusivo do painel administrativo ---
+(() => {
+  const installBtn = document.getElementById('adminInstallBtn');
+  if (!installBtn) return;
+
+  let deferredPrompt = null;
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  function renderInstalled() {
+    installBtn.classList.add('is-installed');
+    installBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Painel instalado';
+    installBtn.disabled = true;
+  }
+
+  if (isStandalone()) {
+    renderInstalled();
+    return;
+  }
+
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredPrompt = event;
+    installBtn.disabled = false;
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (choice?.outcome === 'accepted') renderInstalled();
+      return;
+    }
+
+    const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    showToast(
+      isiOS
+        ? 'No iPhone/iPad: toque em Compartilhar e depois em “Adicionar à Tela de Início”.'
+        : 'Se o botão de instalação não apareceu, abra o menu do navegador e escolha “Instalar app”.',
+      'info'
+    );
+  });
+
+  window.addEventListener('appinstalled', renderInstalled);
 })();
