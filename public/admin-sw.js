@@ -1,6 +1,5 @@
 const CACHE_NAME = 'playbar-admin-v1';
 const ADMIN_ASSETS = [
-  '/admin.html',
   '/admin-manifest.json',
   '/css/admin.css',
   '/js/admin.js',
@@ -36,7 +35,6 @@ self.addEventListener('fetch', event => {
   const isAdminAsset =
     url.origin === self.location.origin &&
     (
-      url.pathname === '/admin.html' ||
       url.pathname === '/admin-manifest.json' ||
       url.pathname.startsWith('/css/admin.css') ||
       url.pathname.startsWith('/js/admin.js') ||
