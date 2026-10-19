@@ -253,6 +253,38 @@
 
                         <hr class="divider">
 
+                        <!-- Mercado Pago OAuth -->
+                        <div class="settings-group mp-integration-card">
+                            <div class="mp-integration-head">
+                                <div>
+                                    <label class="form-label"><i class="fa-solid fa-money-bill-transfer"></i> Mercado Pago</label>
+                                    <p class="helper-text">Conecte a conta do estabelecimento. Os PIX dos clientes serão recebidos diretamente nesta conta.</p>
+                                </div>
+                                <span id="mpStatusBadge" class="mp-status-badge is-loading">Verificando</span>
+                            </div>
+
+                            <div class="mp-status-box">
+                                <div class="mp-status-icon"><i class="fa-solid fa-wallet"></i></div>
+                                <div class="mp-status-copy">
+                                    <strong id="mpStatusTitle">Consultando Mercado Pago...</strong>
+                                    <span id="mpStatusText">Aguarde um instante.</span>
+                                    <small id="mpAccountInfo" style="display:none;"></small>
+                                </div>
+                            </div>
+
+                            <div class="mp-actions">
+                                <button id="mpConnectBtn" class="btn btn-primary" type="button">
+                                    <i class="fa-solid fa-link"></i> Conectar Mercado Pago
+                                </button>
+                                <button id="mpDisconnectBtn" class="btn btn-secondary" type="button" style="display:none;">
+                                    <i class="fa-solid fa-link-slash"></i> Desconectar
+                                </button>
+                            </div>
+                            <small class="mp-security-note"><i class="fa-solid fa-shield-halved"></i> O Access Token não aparece no navegador e fica protegido no servidor.</small>
+                        </div>
+
+                        <hr class="divider">
+
                         <!-- Alterar Senha -->
                         <div class="settings-group">
                             <label class="form-label"><i class="fa-solid fa-shield-halved"></i> Alterar Senha Admin</label>
