@@ -39,6 +39,10 @@ const orderStatusText = $('orderStatusText');
 const popularTracks = $('popularTracks');
 const discoverSection = $('discoverSection');
 const genreChips = $('genreChips');
+const demoCenter = $('demo-center');
+const demoNowPlaying = $('demo-now-playing');
+const demoQueueCount = $('demo-queue-count');
+const demoScreenStatus = $('demo-screen-status');
 
 // Mensagem dedicada
 const messageModal = $('messageModal');
@@ -251,6 +255,13 @@ async function loadDemoMode() {
 }
 
 function applyDemoUi() {
+  demoCenter?.classList.toggle('hidden', !isDemoMode);
+
+  const heroCopy = document.querySelector('.hero p');
+  if (heroCopy) heroCopy.textContent = isDemoMode
+    ? 'Demonstre o PlayBar completo sem cobrança. Escolha músicas, acompanhe no telão e controle tudo pelo painel ADM.'
+    : 'Selecione seu pacote, escolha as músicas e pague por PIX. Seu pedido entra direto na fila do bar.';
+
   document.querySelectorAll('.package-option').forEach(option => {
     const priceEl = option.querySelector('.package-price');
     const radio = option.querySelector('input[name="package"]');
@@ -682,12 +693,22 @@ copyPixBtn?.addEventListener('click', async () => {
 // O sistema de reações para a TV foi removido do cliente para deixar a experiência mais leve.
 socket.on('connect', () => console.log('PlayBar conectado.'));
 socket.on('updatePlayerState', state => {
-  if (!nowPlayingArea || !nowPlayingTitleSpan) return;
   if (state?.nowPlaying) {
-    nowPlayingTitleSpan.textContent = state.nowPlaying.title || 'Música atual';
-    nowPlayingArea.style.display = 'flex';
+    if (nowPlayingTitleSpan) nowPlayingTitleSpan.textContent = state.nowPlaying.title || 'Música atual';
+    if (nowPlayingArea) nowPlayingArea.style.display = 'flex';
+    if (demoNowPlaying) demoNowPlaying.textContent = state.nowPlaying.title || 'Música atual';
+    if (demoScreenStatus) demoScreenStatus.textContent = 'AO VIVO';
   } else {
-    nowPlayingArea.style.display = 'none';
+    if (nowPlayingArea) nowPlayingArea.style.display = 'none';
+    if (demoNowPlaying) demoNowPlaying.textContent = 'Nenhuma música tocando';
+    if (demoScreenStatus) demoScreenStatus.textContent = 'AGUARDANDO';
+  }
+
+  const queueSize = Array.isArray(state?.queue) ? state.queue.length : 0;
+  if (demoQueueCount) {
+    demoQueueCount.textContent = queueSize === 0
+      ? 'Fila vazia'
+      : `${queueSize} música${queueSize === 1 ? '' : 's'} na fila`;
   }
 });
 socket.on('paymentConfirmed', handlePaymentConfirmedUI);
@@ -728,4 +749,5 @@ document.addEventListener('DOMContentLoaded', () => {
   goToStep(1, { scroll: false });
   loadDiscover();
   loadDemoMode();
+  setInterval(loadDemoMode, 15000);
 });
