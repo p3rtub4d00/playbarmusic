@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import youtubeSearchApi from "youtube-search-api";
 import mongoose from "mongoose";
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from "crypto";
 import { promisify } from "util";
 import fetch from "node-fetch";
 
@@ -17,6 +17,14 @@ const RAW_MASTER_URL = process.env.MASTER_URL || '';
 const MASTER_URL = RAW_MASTER_URL.replace(/\/+$/, ''); // Remove barra dupla do final se houver
 const CLIENT_ID = process.env.CLIENT_ID || '';
 const QG_COMMISSION_PERCENT = Number(process.env.QG_COMMISSION_PERCENT);
+
+// --- Mercado Pago OAuth (conta do estabelecimento) ---
+const MP_CLIENT_ID = process.env.MP_CLIENT_ID || '';
+const MP_CLIENT_SECRET = process.env.MP_CLIENT_SECRET || '';
+const MP_REDIRECT_URI = process.env.MP_REDIRECT_URI || '';
+const MP_TOKEN_SECRET = process.env.MP_TOKEN_SECRET || MP_CLIENT_SECRET;
+const MP_AUTH_URL = 'https://auth.mercadopago.com/authorization';
+const MP_TOKEN_URL = 'https://api.mercadopago.com/oauth/token';
 
 if (!MASTER_URL || !CLIENT_ID) {
   console.warn("⚠️ ATENÇÃO: MASTER_URL ou CLIENT_ID não configurados nas variáveis de ambiente!");
@@ -43,9 +51,24 @@ const ConfigSchema = new mongoose.Schema({
   maxPlaybackMinutes: { type: Number, default: 5 },
   autoplayMode: { type: String, default: 'manual' },
   playlistLink: { type: String, default: '' },
-  blockedKeywords: { type: [String], default: [] }
+  blockedKeywords: { type: [String], default: [] },
+  mpAccessTokenEnc: { type: String, default: null },
+  mpRefreshTokenEnc: { type: String, default: null },
+  mpTokenExpiresAt: { type: Date, default: null },
+  mpUserId: { type: String, default: null },
+  mpPublicKey: { type: String, default: null },
+  mpScope: { type: String, default: null },
+  mpLiveMode: { type: Boolean, default: null },
+  mpConnectedAt: { type: Date, default: null }
 });
 const ConfigModel = mongoose.model('Config', ConfigSchema);
+
+const MpOAuthStateSchema = new mongoose.Schema({
+  stateHash: { type: String, required: true, unique: true, index: true },
+  codeVerifier: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 900 }
+});
+const MpOAuthStateModel = mongoose.model('MpOAuthState', MpOAuthStateSchema);
 
 const InactivitySongSchema = new mongoose.Schema({
   title: String,
@@ -114,6 +137,109 @@ function safeTextEquals(value, expected) {
   return valueBuffer.length === expectedBuffer.length && timingSafeEqual(valueBuffer, expectedBuffer);
 }
 
+function mpOAuthConfigured() {
+  return Boolean(MP_CLIENT_ID && MP_CLIENT_SECRET && MP_REDIRECT_URI && MP_TOKEN_SECRET);
+}
+
+function mpTokenKey() {
+  if (!MP_TOKEN_SECRET) throw new Error('Chave de proteção do Mercado Pago não configurada.');
+  return createHash('sha256').update(MP_TOKEN_SECRET).digest();
+}
+
+function encryptMpToken(value) {
+  if (!value) return null;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', mpTokenKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv.toString('base64url'), tag.toString('base64url'), encrypted.toString('base64url')].join('.');
+}
+
+function decryptMpToken(payload) {
+  if (!payload) return null;
+  const [ivPart, tagPart, dataPart] = String(payload).split('.');
+  if (!ivPart || !tagPart || !dataPart) throw new Error('Credencial Mercado Pago inválida.');
+  const decipher = createDecipheriv('aes-256-gcm', mpTokenKey(), Buffer.from(ivPart, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tagPart, 'base64url'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(dataPart, 'base64url')),
+    decipher.final()
+  ]).toString('utf8');
+}
+
+function sha256Hex(value) {
+  return createHash('sha256').update(String(value)).digest('hex');
+}
+
+async function exchangeMercadoPagoToken(body) {
+  const response = await fetch(MP_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    const detail = data.message || data.error_description || data.error || 'Falha ao obter credenciais do Mercado Pago.';
+    throw new Error(detail);
+  }
+  return data;
+}
+
+async function saveMercadoPagoCredential(config, credential) {
+  config.mpAccessTokenEnc = encryptMpToken(credential.access_token);
+  if (credential.refresh_token) config.mpRefreshTokenEnc = encryptMpToken(credential.refresh_token);
+  config.mpTokenExpiresAt = credential.expires_in
+    ? new Date(Date.now() + Number(credential.expires_in) * 1000)
+    : null;
+  config.mpUserId = credential.user_id != null ? String(credential.user_id) : config.mpUserId;
+  config.mpPublicKey = credential.public_key || config.mpPublicKey;
+  config.mpScope = credential.scope || config.mpScope;
+  if (credential.live_mode !== undefined) config.mpLiveMode = Boolean(credential.live_mode);
+  config.mpConnectedAt = new Date();
+  await config.save();
+}
+
+async function refreshMercadoPagoCredential(config) {
+  if (!mpOAuthConfigured() || !config?.mpRefreshTokenEnc) {
+    throw new Error('Reconecte a conta do Mercado Pago no painel administrativo.');
+  }
+  const refreshToken = decryptMpToken(config.mpRefreshTokenEnc);
+  const credential = await exchangeMercadoPagoToken({
+    client_id: MP_CLIENT_ID,
+    client_secret: MP_CLIENT_SECRET,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken
+  });
+  await saveMercadoPagoCredential(config, credential);
+  return credential.access_token;
+}
+
+async function getMercadoPagoAccessToken() {
+  const config = await getConfig();
+
+  if (config?.mpAccessTokenEnc) {
+    const expiresAt = config.mpTokenExpiresAt ? new Date(config.mpTokenExpiresAt).getTime() : null;
+    const refreshBefore = Date.now() + 24 * 60 * 60 * 1000;
+
+    if (!expiresAt || expiresAt > refreshBefore) {
+      return decryptMpToken(config.mpAccessTokenEnc);
+    }
+    return refreshMercadoPagoCredential(config);
+  }
+
+  if (process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    return process.env.MERCADOPAGO_ACCESS_TOKEN;
+  }
+
+  throw new Error('Mercado Pago não conectado. Abra o painel administrativo e conecte a conta do estabelecimento.');
+}
+
+async function getMercadoPagoPaymentClient() {
+  const accessToken = await getMercadoPagoAccessToken();
+  return new Payment(new MercadoPagoConfig({ accessToken }));
+}
+
+
 async function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
   const derivedKey = await scrypt(password, salt, 64);
@@ -177,6 +303,109 @@ app.post('/admin/change-password', requireAdminAuth, async (req, res) => {
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ ok: false, error: 'Não foi possível alterar a senha.' });
+  }
+});
+
+
+app.get('/api/admin/mercadopago/status', requireAdminAuth, async (req, res) => {
+  try {
+    const config = await getConfig();
+    const connected = Boolean(config?.mpAccessTokenEnc);
+    const legacy = !connected && Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN);
+    return res.json({
+      ok: true,
+      configured: mpOAuthConfigured(),
+      connected,
+      source: connected ? 'oauth' : (legacy ? 'legacy' : 'none'),
+      userId: connected ? config.mpUserId : null,
+      expiresAt: connected ? config.mpTokenExpiresAt : null,
+      connectedAt: connected ? config.mpConnectedAt : null,
+      liveMode: connected ? config.mpLiveMode : null
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: 'Não foi possível consultar a conexão com o Mercado Pago.' });
+  }
+});
+
+app.post('/api/admin/mercadopago/connect', requireAdminAuth, async (req, res) => {
+  try {
+    if (!mpOAuthConfigured()) {
+      return res.status(503).json({ ok: false, error: 'OAuth do Mercado Pago ainda não foi configurado no servidor.' });
+    }
+
+    const state = randomBytes(32).toString('base64url');
+    const codeVerifier = randomBytes(48).toString('base64url');
+    const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+
+    await MpOAuthStateModel.create({
+      stateHash: sha256Hex(state),
+      codeVerifier
+    });
+
+    const params = new URLSearchParams({
+      client_id: MP_CLIENT_ID,
+      response_type: 'code',
+      platform_id: 'mp',
+      state,
+      redirect_uri: MP_REDIRECT_URI,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
+    });
+
+    return res.json({ ok: true, url: `${MP_AUTH_URL}?${params.toString()}` });
+  } catch (error) {
+    console.error('[Mercado Pago OAuth] Erro ao iniciar conexão:', error);
+    return res.status(500).json({ ok: false, error: 'Não foi possível iniciar a conexão com o Mercado Pago.' });
+  }
+});
+
+app.post('/api/admin/mercadopago/disconnect', requireAdminAuth, async (req, res) => {
+  try {
+    const config = await getConfig();
+    config.mpAccessTokenEnc = null;
+    config.mpRefreshTokenEnc = null;
+    config.mpTokenExpiresAt = null;
+    config.mpUserId = null;
+    config.mpPublicKey = null;
+    config.mpScope = null;
+    config.mpLiveMode = null;
+    config.mpConnectedAt = null;
+    await config.save();
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: 'Não foi possível desconectar a conta do Mercado Pago.' });
+  }
+});
+
+app.get('/api/mercadopago/oauth/callback', async (req, res) => {
+  const redirectAdmin = (status) => res.redirect(`/admin.html?mp=${encodeURIComponent(status)}`);
+
+  try {
+    const { code, state, error } = req.query || {};
+    if (error) return redirectAdmin('cancelled');
+    if (typeof code !== 'string' || typeof state !== 'string') return redirectAdmin('error');
+    if (!mpOAuthConfigured()) return redirectAdmin('config');
+
+    const oauthState = await MpOAuthStateModel.findOneAndDelete({ stateHash: sha256Hex(state) });
+    if (!oauthState) return redirectAdmin('state');
+
+    const credential = await exchangeMercadoPagoToken({
+      client_id: MP_CLIENT_ID,
+      client_secret: MP_CLIENT_SECRET,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: MP_REDIRECT_URI,
+      code_verifier: oauthState.codeVerifier
+    });
+
+    const config = await getConfig();
+    await saveMercadoPagoCredential(config, credential);
+
+    console.log(`[Mercado Pago OAuth] Conta conectada. User ID: ${credential.user_id || 'não informado'}`);
+    return redirectAdmin('connected');
+  } catch (error) {
+    console.error('[Mercado Pago OAuth] Falha no callback:', error.message);
+    return redirectAdmin('error');
   }
 });
 
@@ -273,10 +502,6 @@ async function sendHeartbeat() {
 }
 // Envia o sinal a cada 15 segundos
 setInterval(sendHeartbeat, 15000);
-
-const mpClient = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN
-});
 
 const INACTIVITY_TIMEOUT = 5000;
 let inactivityTimer = null;
@@ -717,7 +942,7 @@ app.post("/create-payment", async (req, res) => {
       notification_url: notification_url
     };
 
-    const payment = new Payment(mpClient);
+    const payment = await getMercadoPagoPaymentClient();
     const result = await payment.create({ body: payment_data });
 
     if (!result?.point_of_interaction?.transaction_data?.qr_code_base64) {
@@ -775,7 +1000,7 @@ app.post("/webhook", async (req, res) => {
     }
     if (!paymentId) return res.sendStatus(200);
 
-    const payment = new Payment(mpClient);
+    const payment = await getMercadoPagoPaymentClient();
     const mpPayment = await payment.get({ id: paymentId });
 
     if (mpPayment.status === 'approved') {
