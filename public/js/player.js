@@ -23,7 +23,7 @@ const queueList = document.getElementById('queue-list');
 const qrImg = document.getElementById('qr-img');
 const notificationPopup = document.getElementById('notification-popup');
 const notifSongTitle = document.getElementById('notif-song-title');
-const reactionContainer = document.getElementById('reaction-container'); // [NOVO]
+const idleScreen = document.getElementById('idle-screen');
 
 // TTS REATIVADO
 const synth = window.speechSynthesis;
@@ -69,43 +69,12 @@ function showNotification(title) {
     }, 5000);
 }
 
-// [NOVO] Função para criar Chuva de Emojis
-function createReaction(emoji) {
-    if (!reactionContainer) return;
-
-    // Cria múltiplos elementos para parecer "chuva"
-    const count = 5; // Quantidade de emojis por clique
-    
-    for (let i = 0; i < count; i++) {
-        const el = document.createElement('div');
-        el.classList.add('floating-emoji');
-        el.textContent = emoji;
-
-        // Posição horizontal aleatória (0 a 100%)
-        const randomLeft = Math.random() * 100;
-        el.style.left = `${randomLeft}%`;
-
-        // Tamanho levemente variável
-        const randomSize = 2 + Math.random() * 2; // entre 2rem e 4rem
-        el.style.fontSize = `${randomSize}rem`;
-
-        // Atraso aleatório para não subirem todos juntos
-        const randomDelay = Math.random() * 0.5;
-        el.style.animationDelay = `${randomDelay}s`;
-        
-        // Duração aleatória para velocidades diferentes
-        const randomDuration = 3 + Math.random() * 2;
-        el.style.animationDuration = `${randomDuration}s`;
-
-        reactionContainer.appendChild(el);
-
-        // Remove do DOM quando a animação acabar (4s + delay)
-        setTimeout(() => {
-            el.remove();
-        }, (randomDuration + randomDelay) * 1000);
-    }
+function setIdleScreen(visible) {
+    if (!idleScreen) return;
+    idleScreen.classList.toggle('hidden', !visible);
 }
 
+setIdleScreen(true);
 
 // QR Code Generator
 window.addEventListener('load', () => {
@@ -171,15 +140,11 @@ socket.on('player:newOrderNotification', (data) => {
     resetBotTimer();
 });
 
-// [NOVO] Recebe reação do servidor e desenha na tela
-socket.on('player:showReaction', (emoji) => {
-    createReaction(emoji);
-});
-
 socket.on('updatePlayerState', (state) => {
     if (state && state.queue) {
         updateQueueDisplay(state.queue);
     }
+    setIdleScreen(!state?.nowPlaying);
 });
 
 function updateQueueDisplay(queue) {
@@ -197,6 +162,7 @@ function updateQueueDisplay(queue) {
 }
 
 socket.on('player:playVideo', ({ videoId, title, message }) => {
+  setIdleScreen(false);
   const videoInfo = { videoId, title, message };
   if (isPlayerReady) {
     playVideo(videoInfo);
