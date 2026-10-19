@@ -63,6 +63,12 @@ const ConfigSchema = new mongoose.Schema({
   autoplayMode: { type: String, default: 'manual' },
   playlistLink: { type: String, default: '' },
   blockedKeywords: { type: [String], default: [] },
+  package1Limit: { type: Number, default: 3 },
+  package1Price: { type: Number, default: 2.00 },
+  package2Limit: { type: Number, default: 5 },
+  package2Price: { type: Number, default: 3.00 },
+  messageCost: { type: Number, default: 1.00 },
+  ordersEnabled: { type: Boolean, default: true },
   mpAccessTokenEnc: { type: String, default: null },
   mpRefreshTokenEnc: { type: String, default: null },
   mpTokenExpiresAt: { type: Date, default: null },
@@ -140,6 +146,7 @@ const PlayHistoryModel = mongoose.model('PlayHistory', PlayHistorySchema);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const playerSockets = new Set();
 
 app.use(express.json());
 
@@ -448,6 +455,31 @@ app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 
+app.get('/api/public/config', async (req, res) => {
+  try {
+    const config = await getConfig();
+    res.json({
+      ok: true,
+      packages: [
+        { limit: Number(config.package1Limit) || 3, price: Number(config.package1Price) || 2.00, featured: false },
+        { limit: Number(config.package2Limit) || 5, price: Number(config.package2Price) || 3.00, featured: true }
+      ],
+      messageCost: Number(config.messageCost) >= 0 ? Number(config.messageCost) : 1.00,
+      ordersEnabled: config.ordersEnabled !== false
+    });
+  } catch {
+    res.json({
+      ok: true,
+      packages: [
+        { limit: 3, price: 2.00, featured: false },
+        { limit: 5, price: 3.00, featured: true }
+      ],
+      messageCost: 1.00,
+      ordersEnabled: true
+    });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
@@ -500,6 +532,111 @@ app.get('/api/admin/commission', requireAdminAuth, async (req, res) => {
     });
   } catch (error) {
     return res.status(502).json({ ok: false, error: 'Nao foi possivel consultar a comissao no QG.' });
+  }
+});
+
+app.get('/api/admin/dashboard', requireAdminAuth, async (req, res) => {
+  try {
+    const config = await getConfig();
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+
+    const [queueCount, paymentsToday, pendingPayments, anyApproved] = await Promise.all([
+      QueueModel.countDocuments(),
+      PaymentModel.find({ status: 'approved', createdAt: { $gte: startToday } })
+        .select('amount description createdAt')
+        .lean(),
+      PaymentModel.countDocuments({ status: 'pending' }),
+      PaymentModel.exists({ status: 'approved' })
+    ]);
+
+    const revenueToday = paymentsToday.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const mpConnected = Boolean(config.mpAccessTokenEnc);
+    const legacyMp = !mpConnected && Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN);
+
+    let qg = {
+      configured: Boolean(MASTER_URL && CLIENT_ID),
+      online: false,
+      active: null,
+      demo: false
+    };
+
+    if (qg.configured) {
+      try {
+        const response = await fetch(`${MASTER_URL}/api/check-license?client_id=${encodeURIComponent(CLIENT_ID)}`);
+        const data = await response.json().catch(() => ({}));
+        qg = {
+          configured: true,
+          online: response.ok && data?.ok === true,
+          active: data?.active ?? null,
+          demo: data?.demo === true || data?.client?.demoMode === true
+        };
+      } catch {}
+    }
+
+    res.json({
+      ok: true,
+      nowPlaying: nowPlayingInfo,
+      playerOnline: playerSockets.size > 0,
+      queueCount,
+      ordersToday: paymentsToday.length,
+      revenueToday,
+      dailyRevenue: Number(config.dailyRevenue) || 0,
+      pendingPayments,
+      ordersEnabled: config.ordersEnabled !== false,
+      mercadoPago: {
+        connected: mpConnected || legacyMp,
+        oauth: mpConnected,
+        webhookConfigured: Boolean(MP_WEBHOOK_SECRET),
+        userId: mpConnected ? config.mpUserId : null
+      },
+      qg,
+      onboarding: {
+        mercadoPago: mpConnected || legacyMp,
+        prices: Number(config.package1Price) > 0 && Number(config.package2Price) > 0,
+        screen: playerSockets.size > 0,
+        firstOrder: Boolean(anyApproved)
+      }
+    });
+  } catch (error) {
+    console.error('[Admin Dashboard] Erro:', error.message);
+    res.status(500).json({ ok: false, error: 'Não foi possível carregar o resumo do painel.' });
+  }
+});
+
+app.get('/api/admin/payments', requireAdminAuth, async (req, res) => {
+  try {
+    const requestedDays = Number(req.query.days);
+    const days = [1, 7, 30].includes(requestedDays) ? requestedDays : 1;
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const payments = await PaymentModel.find({ createdAt: { $gte: from } })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .select('mpPaymentId userPhone amount description status videos createdAt')
+      .lean();
+
+    const totalApproved = payments
+      .filter(item => item.status === 'approved')
+      .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+    res.json({
+      ok: true,
+      days,
+      totalApproved,
+      approvedCount: payments.filter(item => item.status === 'approved').length,
+      payments: payments.map(item => ({
+        id: item.mpPaymentId,
+        phone: item.userPhone || null,
+        amount: Number(item.amount) || 0,
+        description: item.description || '',
+        status: item.status,
+        tracks: Array.isArray(item.videos) ? item.videos.length : 0,
+        createdAt: item.createdAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: 'Não foi possível carregar o histórico financeiro.' });
   }
 });
 
@@ -562,7 +699,13 @@ async function getConfig() {
       maxPlaybackMinutes: 5,
       autoplayMode: 'manual',
       playlistLink: '',
-      blockedKeywords: []
+      blockedKeywords: [],
+      package1Limit: 3,
+      package1Price: 2,
+      package2Limit: 5,
+      package2Price: 3,
+      messageCost: 1,
+      ordersEnabled: true
     };
   }
 }
@@ -602,6 +745,7 @@ async function broadcastPlayerState() {
   try {
     const queue = await QueueModel.find({}).sort({ priority: -1, createdAt: 1 }).lean(); 
     const formattedQueue = queue.map(item => ({
+        queueId: String(item._id),
         id: item.videoId,
         title: item.title,
         isCustomer: item.isCustomer,
@@ -1035,6 +1179,15 @@ app.post("/create-payment", async (req, res) => {
       });
     }
 
+    const commercialConfig = await getConfig();
+    if (commercialConfig.ordersEnabled === false) {
+      return res.status(503).json({
+        ok: false,
+        paused: true,
+        error: 'Pedidos temporariamente pausados pelo estabelecimento.'
+      });
+    }
+
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({ ok: false, error: "Valor de pagamento inválido." });
@@ -1169,6 +1322,7 @@ app.post("/webhook", async (req, res) => {
 
 io.on("connection", async (socket) => {
   socket.on('player:ready', async () => {
+    playerSockets.add(socket.id);
     const [freshConfig, queue] = await Promise.all([
         getConfig(),
         QueueModel.find({}).sort({ priority: -1, createdAt: 1 }).lean()
@@ -1198,7 +1352,11 @@ io.on("connection", async (socket) => {
   socket.on('player:ping', () => {
     socket.emit('player:pong', { ts: Date.now() });
   });
-socket.on('admin:getList', async () => {
+socket.on('disconnect', () => {
+    playerSockets.delete(socket.id);
+  });
+
+  socket.on('admin:getList', async () => {
     try {
         const [freshConfig, inactivityList, queue, playHistory] = await Promise.all([
             getConfig(),
@@ -1221,8 +1379,17 @@ socket.on('admin:getList', async () => {
         });
         socket.emit('admin:updateMaxPlaybackMinutes', freshConfig.maxPlaybackMinutes);
         socket.emit('admin:loadBlockedKeywords', freshConfig.blockedKeywords || []);
+        socket.emit('admin:loadCustomerConfig', {
+          package1Limit: Number(freshConfig.package1Limit) || 3,
+          package1Price: Number(freshConfig.package1Price) || 2,
+          package2Limit: Number(freshConfig.package2Limit) || 5,
+          package2Price: Number(freshConfig.package2Price) || 3,
+          messageCost: Number(freshConfig.messageCost) >= 0 ? Number(freshConfig.messageCost) : 1,
+          ordersEnabled: freshConfig.ordersEnabled !== false
+        });
 
         const formattedQueue = queue.map(item => ({ 
+            queueId: String(item._id),
             id: item.videoId, 
             title: item.title, 
             isCustomer: item.isCustomer, 
@@ -1340,6 +1507,81 @@ socket.on('admin:getList', async () => {
           if (!nowPlayingInfo) playNextInQueue();
           else broadcastPlayerState();
       } catch(e) {}
+    }
+  });
+
+  socket.on('admin:saveCustomerConfig', async (payload, callback) => {
+    try {
+      const config = await getConfig();
+      const p1Limit = Math.max(1, Math.min(20, Number(payload?.package1Limit) || 3));
+      const p2Limit = Math.max(1, Math.min(20, Number(payload?.package2Limit) || 5));
+      const p1Price = Math.max(0.5, Math.min(999, Number(payload?.package1Price) || 2));
+      const p2Price = Math.max(0.5, Math.min(999, Number(payload?.package2Price) || 3));
+      const messageCost = Math.max(0, Math.min(999, Number(payload?.messageCost) || 0));
+
+      config.package1Limit = p1Limit;
+      config.package1Price = Number(p1Price.toFixed(2));
+      config.package2Limit = p2Limit;
+      config.package2Price = Number(p2Price.toFixed(2));
+      config.messageCost = Number(messageCost.toFixed(2));
+      if (typeof payload?.ordersEnabled === 'boolean') config.ordersEnabled = payload.ordersEnabled;
+      await config.save();
+
+      const response = {
+        package1Limit: config.package1Limit,
+        package1Price: config.package1Price,
+        package2Limit: config.package2Limit,
+        package2Price: config.package2Price,
+        messageCost: config.messageCost,
+        ordersEnabled: config.ordersEnabled !== false
+      };
+      io.emit('admin:loadCustomerConfig', response);
+      if (typeof callback === 'function') callback({ ok: true, config: response });
+    } catch (error) {
+      if (typeof callback === 'function') callback({ ok: false, error: 'Não foi possível salvar os preços.' });
+    }
+  });
+
+  socket.on('admin:setOrdersEnabled', async (enabled, callback) => {
+    try {
+      const config = await getConfig();
+      config.ordersEnabled = Boolean(enabled);
+      await config.save();
+      io.emit('admin:loadCustomerConfig', {
+        package1Limit: Number(config.package1Limit) || 3,
+        package1Price: Number(config.package1Price) || 2,
+        package2Limit: Number(config.package2Limit) || 5,
+        package2Price: Number(config.package2Price) || 3,
+        messageCost: Number(config.messageCost) >= 0 ? Number(config.messageCost) : 1,
+        ordersEnabled: config.ordersEnabled !== false
+      });
+      if (typeof callback === 'function') callback({ ok: true, ordersEnabled: config.ordersEnabled !== false });
+    } catch {
+      if (typeof callback === 'function') callback({ ok: false });
+    }
+  });
+
+  socket.on('admin:queueNext', async (queueId, callback) => {
+    try {
+      if (!mongoose.isValidObjectId(queueId)) throw new Error('ID inválido');
+      const item = await QueueModel.findByIdAndUpdate(queueId, { $set: { priority: 100 } }, { new: true });
+      if (!item) throw new Error('Música não encontrada');
+      await broadcastPlayerState();
+      if (typeof callback === 'function') callback({ ok: true });
+    } catch (error) {
+      if (typeof callback === 'function') callback({ ok: false, error: error.message });
+    }
+  });
+
+  socket.on('admin:queueRemove', async (queueId, callback) => {
+    try {
+      if (!mongoose.isValidObjectId(queueId)) throw new Error('ID inválido');
+      const item = await QueueModel.findByIdAndDelete(queueId);
+      if (!item) throw new Error('Música não encontrada');
+      await broadcastPlayerState();
+      if (typeof callback === 'function') callback({ ok: true });
+    } catch (error) {
+      if (typeof callback === 'function') callback({ ok: false, error: error.message });
     }
   });
 
