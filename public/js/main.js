@@ -85,6 +85,7 @@ let currentPaymentId = null;
 let paymentPollingInterval = null;
 let deferredPrompt = null;
 let discoverLoaded = false;
+let isDemoMode = false;
 
 // --- Helpers ---
 function escapeHtml(value = '') {
@@ -238,6 +239,57 @@ function resetUI() {
   goToStep(1);
 }
 
+async function loadDemoMode() {
+  try {
+    const res = await fetch('/api/status', { cache: 'no-store' });
+    const data = await res.json();
+    isDemoMode = data?.demo === true || data?.client?.demoMode === true;
+  } catch {
+    isDemoMode = false;
+  }
+  applyDemoUi();
+}
+
+function applyDemoUi() {
+  document.querySelectorAll('.package-option').forEach(option => {
+    const priceEl = option.querySelector('.package-price');
+    const radio = option.querySelector('input[name="package"]');
+    if (!priceEl || !radio) return;
+    const price = Number(radio.dataset.price || 0);
+    priceEl.innerHTML = isDemoMode
+      ? 'GRÁTIS'
+      : `<span>R$</span> ${price.toFixed(2).replace('.', ',')}`;
+  });
+
+  const step3Copy = document.querySelector('#step-3 .section-heading p');
+  if (step3Copy) step3Copy.textContent = isDemoMode
+    ? 'Revise seu pedido antes de enviar.'
+    : 'Revise antes de gerar o PIX.';
+
+  const step4Title = document.querySelector('#step-4 .section-heading h2');
+  const step4Copy = document.querySelector('#step-4 .section-heading p');
+  const paymentLogo = document.querySelector('#step-4 .pix-logo');
+  const paymentHeading = document.querySelector('#step-4 .payment-card h3');
+  const paymentCopy = document.querySelector('#step-4 .payment-card > p');
+  const progressLabel = document.querySelector('.wizard-step[data-step="4"] em');
+  const trustFirst = document.querySelector('.trust-row div:first-child small');
+
+  if (step4Title) step4Title.textContent = isDemoMode ? 'Modo Demo' : 'Pagamento';
+  if (step4Copy) step4Copy.textContent = isDemoMode
+    ? 'Seu pedido será enviado sem cobrança.'
+    : 'Finalize por PIX para colocar as músicas na fila.';
+  if (paymentLogo) paymentLogo.textContent = isDemoMode ? 'DEMO' : 'PIX';
+  if (paymentHeading) paymentHeading.textContent = isDemoMode ? 'Pedido gratuito' : 'Pagamento instantâneo';
+  if (paymentCopy) paymentCopy.textContent = isDemoMode
+    ? 'Nenhum PIX será gerado. As músicas entram direto na fila.'
+    : 'Após a confirmação, seu pedido entra automaticamente na fila do bar.';
+  if (progressLabel) progressLabel.textContent = isDemoMode ? 'Demo' : 'PIX';
+  if (trustFirst) trustFirst.textContent = isDemoMode ? 'Modo demo' : 'PIX rápido';
+
+  updatePaymentButtonText();
+  if (currentStep === 3) updateReviewStep();
+}
+
 function updateSelectedPackage() {
   const checked = document.querySelector('input[name="package"]:checked');
   if (!checked) return;
@@ -256,7 +308,9 @@ function updateSelectedPackage() {
 
 function updatePaymentButtonText() {
   if (!pagarBtn) return;
-  pagarBtn.textContent = `PAGAR R$ ${selectedPackage.price.toFixed(2).replace('.', ',')} (PIX)`;
+  pagarBtn.textContent = isDemoMode
+    ? 'ENVIAR PEDIDO GRÁTIS'
+    : `PAGAR R$ ${selectedPackage.price.toFixed(2).replace('.', ',')} (PIX)`;
   pagarBtn.disabled = selectedVideos.length !== selectedPackage.limit;
 }
 
@@ -287,7 +341,9 @@ function atualizarLista() {
 
 function updateReviewStep() {
   if (reviewPackageText) reviewPackageText.textContent = selectedPackage.description;
-  if (reviewPriceText) reviewPriceText.textContent = `R$ ${selectedPackage.price.toFixed(2).replace('.', ',')}`;
+  if (reviewPriceText) reviewPriceText.textContent = isDemoMode
+    ? 'GRÁTIS • MODO DEMO'
+    : `R$ ${selectedPackage.price.toFixed(2).replace('.', ',')}`;
   if (reviewCountText) reviewCountText.textContent = `${selectedVideos.length} músicas`;
   if (reviewSelected) {
     reviewSelected.innerHTML = selectedVideos.map(v => `
@@ -428,6 +484,14 @@ async function proceedToPayment() {
     if (!data.ok) throw new Error(data.error || 'Não foi possível gerar o PIX.');
 
     currentPaymentId = data.paymentId || null;
+
+    if (data.demo === true) {
+      if (orderStatusText) orderStatusText.textContent = 'Modo demo: pedido enviado sem cobrança e já colocado na fila.';
+      showToast('Modo demo: pedido enviado grátis!', 'success');
+      goToStep(5);
+      return;
+    }
+
     if (pixArea) pixArea.style.display = 'block';
     if (qrCodeImg) qrCodeImg.src = `data:image/png;base64,${data.qr}`;
     if (copiaColaText) copiaColaText.value = data.copiaCola || '';
@@ -565,7 +629,9 @@ pagarBtn?.addEventListener('click', () => {
   modalMessageText.value = '';
   if (messageCharCount) messageCharCount.textContent = '0/180';
   if ($('modalTitle')) $('modalTitle').textContent = 'Quer deixar uma mensagem?';
-  if ($('modalQuestion')) $('modalQuestion').textContent = 'Por mais R$ 1,00, sua mensagem aparece na TV antes da música.';
+  if ($('modalQuestion')) $('modalQuestion').textContent = isDemoMode
+    ? 'No modo demo, a mensagem também é grátis e aparece na TV antes da música.'
+    : 'Por mais R$ 1,00, sua mensagem aparece na TV antes da música.';
   finalMessage = null;
   finalAmount = selectedPackage.price;
   finalDescription = selectedPackage.description;
@@ -583,7 +649,9 @@ modalBtnYes?.addEventListener('click', () => {
   if ($('modalQuestion')) $('modalQuestion').textContent = 'Ela será exibida na TV antes do seu pedido.';
   finalAmount = selectedPackage.price + MESSAGE_COST;
   finalDescription = selectedPackage.description + ' + Mensagem';
-  modalBtnConfirm.textContent = `IR PARA O PIX - R$ ${finalAmount.toFixed(2).replace('.', ',')}`;
+  modalBtnConfirm.textContent = isDemoMode
+    ? 'ENVIAR PEDIDO GRÁTIS'
+    : `IR PARA O PIX - R$ ${finalAmount.toFixed(2).replace('.', ',')}`;
 });
 modalBtnConfirm?.addEventListener('click', () => {
   finalMessage = modalMessageText.value.trim();
@@ -659,4 +727,5 @@ document.addEventListener('DOMContentLoaded', () => {
   updateSelectedPackage();
   goToStep(1, { scroll: false });
   loadDiscover();
+  loadDemoMode();
 });
