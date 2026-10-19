@@ -537,3 +537,141 @@ socket.on('admin:playHistory', (history) => {
     if (!isMobileAdmin() && modal.classList.contains('open')) closeAdminModal({ restoreScroll: false });
   });
 })();
+
+
+// --- Mercado Pago OAuth ---
+(() => {
+  const badge = document.getElementById('mpStatusBadge');
+  const title = document.getElementById('mpStatusTitle');
+  const textEl = document.getElementById('mpStatusText');
+  const accountInfo = document.getElementById('mpAccountInfo');
+  const connectBtn = document.getElementById('mpConnectBtn');
+  const disconnectBtn = document.getElementById('mpDisconnectBtn');
+
+  if (!badge || !title || !textEl || !connectBtn || !disconnectBtn) return;
+
+  function setBusy(busy) {
+    connectBtn.disabled = busy;
+    disconnectBtn.disabled = busy;
+  }
+
+  function renderStatus(data) {
+    badge.className = 'mp-status-badge';
+
+    if (!data.configured) {
+      badge.classList.add('is-warning');
+      badge.textContent = 'Configuração pendente';
+      title.textContent = 'OAuth ainda não configurado';
+      textEl.textContent = 'Configure as credenciais da aplicação Mercado Pago no servidor para liberar a conexão automática.';
+      accountInfo.style.display = 'none';
+      connectBtn.style.display = 'inline-flex';
+      connectBtn.innerHTML = '<i class="fa-solid fa-link"></i> Configuração pendente';
+      connectBtn.disabled = true;
+      disconnectBtn.style.display = 'none';
+      return;
+    }
+
+    connectBtn.disabled = false;
+
+    if (data.connected) {
+      badge.classList.add('is-connected');
+      badge.textContent = 'Conectado';
+      title.textContent = 'Conta Mercado Pago conectada';
+      textEl.textContent = 'Os próximos PIX serão gerados diretamente na conta autorizada pelo estabelecimento.';
+      if (data.userId) {
+        accountInfo.textContent = `Conta Mercado Pago ID: ${data.userId}`;
+        accountInfo.style.display = 'block';
+      } else {
+        accountInfo.style.display = 'none';
+      }
+      connectBtn.style.display = 'inline-flex';
+      connectBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Reconectar';
+      disconnectBtn.style.display = 'inline-flex';
+      return;
+    }
+
+    if (data.source === 'legacy') {
+      badge.classList.add('is-warning');
+      badge.textContent = 'Chave antiga';
+      title.textContent = 'Mercado Pago funcionando com Access Token manual';
+      textEl.textContent = 'Conecte a conta para migrar para OAuth e não precisar mais informar chaves manualmente.';
+    } else {
+      badge.classList.add('is-disconnected');
+      badge.textContent = 'Desconectado';
+      title.textContent = 'Nenhuma conta Mercado Pago conectada';
+      textEl.textContent = 'O dono do estabelecimento pode autorizar a própria conta com poucos cliques.';
+    }
+
+    accountInfo.style.display = 'none';
+    connectBtn.style.display = 'inline-flex';
+    connectBtn.innerHTML = '<i class="fa-solid fa-link"></i> Conectar Mercado Pago';
+    disconnectBtn.style.display = 'none';
+  }
+
+  async function loadStatus() {
+    try {
+      const response = await fetch('/api/admin/mercadopago/status', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Falha ao consultar Mercado Pago.');
+      renderStatus(data);
+    } catch (error) {
+      badge.className = 'mp-status-badge is-disconnected';
+      badge.textContent = 'Erro';
+      title.textContent = 'Não foi possível consultar o Mercado Pago';
+      textEl.textContent = error.message || 'Atualize a página e tente novamente.';
+    }
+  }
+
+  connectBtn.addEventListener('click', async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/admin/mercadopago/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.url) throw new Error(data.error || 'Não foi possível iniciar a conexão.');
+      window.location.assign(data.url);
+    } catch (error) {
+      showToast(error.message || 'Erro ao conectar Mercado Pago.', 'error');
+      setBusy(false);
+    }
+  });
+
+  disconnectBtn.addEventListener('click', async () => {
+    if (!confirm('Desconectar a conta do Mercado Pago? Novos PIX deixarão de usar esta conta.')) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/admin/mercadopago/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível desconectar.');
+      showToast('Conta Mercado Pago desconectada.', 'success');
+      await loadStatus();
+    } catch (error) {
+      showToast(error.message || 'Erro ao desconectar Mercado Pago.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const mpResult = params.get('mp');
+  if (mpResult) {
+    if (mpResult === 'connected') showToast('Mercado Pago conectado com sucesso!', 'success');
+    else if (mpResult === 'cancelled') showToast('Conexão com Mercado Pago cancelada.', 'info');
+    else if (mpResult === 'config') showToast('Configuração OAuth do Mercado Pago incompleta.', 'error');
+    else if (mpResult === 'state') showToast('A autorização expirou. Tente conectar novamente.', 'error');
+    else showToast('Não foi possível concluir a conexão com Mercado Pago.', 'error');
+
+    params.delete('mp');
+    const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+    window.history.replaceState({}, '', clean);
+  }
+
+  loadStatus();
+})();
