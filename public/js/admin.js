@@ -484,7 +484,7 @@ socket.on('admin:playHistory', (history) => {
 
 
 
-// --- Navegação mobile em tela cheia ---
+// --- Navegação organizada: uma área por vez no desktop + modal no celular ---
 (() => {
   const MOBILE_ADMIN_BREAKPOINT = 820;
   const modal = document.getElementById('adminSectionModal');
@@ -492,15 +492,37 @@ socket.on('admin:playHistory', (history) => {
   const modalTitle = document.getElementById('adminSectionModalTitle');
   const closeBtn = document.getElementById('adminSectionModalClose');
   const navLinks = Array.from(document.querySelectorAll('.sidebar .nav-link'));
+  const grid = document.querySelector('.grid-layout');
+  const pageTitle = document.getElementById('adminPageTitle');
+  const pageSubtitle = document.getElementById('adminPageSubtitle');
 
   if (!modal || !modalBody || !modalTitle || !closeBtn || navLinks.length === 0) return;
 
-  const titles = {
-    dashboard: 'Visão Geral',
-    player: 'Controle do Player',
-    queue: 'Fila & Buscas',
-    autoplay: 'Inatividade (Autoplay)',
-    settings: 'Configurações'
+  const meta = {
+    dashboard: {
+      title: 'Visão Geral',
+      subtitle: 'Acompanhe o funcionamento do bar em tempo real.'
+    },
+    player: {
+      title: 'Player',
+      subtitle: 'Controle a reprodução e o volume do telão.'
+    },
+    queue: {
+      title: 'Fila & Buscas',
+      subtitle: 'Gerencie a sequência e adicione músicas manualmente.'
+    },
+    autoplay: {
+      title: 'Autoplay',
+      subtitle: 'Defina o que toca quando não há pedidos de clientes.'
+    },
+    finance: {
+      title: 'Financeiro',
+      subtitle: 'Consulte pedidos pagos, faturamento e comissão.'
+    },
+    settings: {
+      title: 'Configurações',
+      subtitle: 'Ajuste preços, integrações, filtros e preferências do sistema.'
+    }
   };
 
   const hrefToGroup = {
@@ -508,17 +530,50 @@ socket.on('admin:playHistory', (history) => {
     '#player-section': 'player',
     '#queue-section': 'queue',
     '#autoplay-section': 'autoplay',
+    '#finance-section': 'finance',
     '#settings-section': 'settings'
   };
 
   let movedCards = [];
   let pageScrollY = 0;
+  let currentGroup = 'dashboard';
 
   const isMobileAdmin = () => window.innerWidth <= MOBILE_ADMIN_BREAKPOINT;
 
   function setActiveNav(link) {
     document.querySelectorAll('.sidebar .nav-item').forEach(item => item.classList.remove('active'));
     link?.closest('.nav-item')?.classList.add('active');
+  }
+
+  function updateHeader(group) {
+    const info = meta[group] || meta.dashboard;
+    if (pageTitle) pageTitle.textContent = info.title;
+    if (pageSubtitle) pageSubtitle.textContent = info.subtitle;
+  }
+
+  function applyGroupVisibility(group) {
+    currentGroup = group;
+    updateHeader(group);
+
+    document.querySelectorAll('[data-admin-group]').forEach(section => {
+      section.classList.toggle('admin-group-hidden', section.dataset.adminGroup !== group);
+    });
+
+    document.querySelectorAll('.admin-page').forEach(page => {
+      page.classList.toggle('admin-page-hidden', page.dataset.adminGroup !== group);
+    });
+
+    if (grid) {
+      const usesGrid = ['player', 'queue', 'autoplay', 'settings'].includes(group);
+      grid.style.display = usesGrid ? 'grid' : 'none';
+      grid.classList.toggle('single-column', usesGrid);
+
+      grid.querySelectorAll(':scope > .column').forEach(column => {
+        const visibleCard = Array.from(column.querySelectorAll('[data-admin-group]'))
+          .some(card => card.dataset.adminGroup === group);
+        column.classList.toggle('admin-column-hidden', usesGrid && !visibleCard);
+      });
+    }
   }
 
   function restoreCards() {
@@ -537,6 +592,9 @@ socket.on('admin:playHistory', (history) => {
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('admin-modal-open');
+    applyGroupVisibility('dashboard');
+    const dashboardLink = navLinks.find(link => hrefToGroup[link.getAttribute('href')] === 'dashboard');
+    setActiveNav(dashboardLink);
     if (restoreScroll) window.scrollTo(0, pageScrollY);
   }
 
@@ -544,14 +602,16 @@ socket.on('admin:playHistory', (history) => {
     const cards = Array.from(document.querySelectorAll(`[data-admin-group="${group}"]`));
     if (!cards.length) return;
 
-    closeAdminModal({ restoreScroll: false });
+    if (modal.classList.contains('open')) closeAdminModal({ restoreScroll: false });
     pageScrollY = window.scrollY;
-    modalTitle.textContent = titles[group] || 'Painel Administrativo';
+    currentGroup = group;
+    modalTitle.textContent = meta[group]?.title || 'Painel Administrativo';
     setActiveNav(sourceLink);
 
     movedCards = cards.map(card => {
       const placeholder = document.createComment(`admin-modal-${group}`);
       card.parentNode.insertBefore(placeholder, card);
+      card.classList.remove('admin-group-hidden', 'admin-page-hidden');
       modalBody.appendChild(card);
       return { card, placeholder };
     });
@@ -566,9 +626,24 @@ socket.on('admin:playHistory', (history) => {
   navLinks.forEach(link => {
     link.addEventListener('click', event => {
       const group = hrefToGroup[link.getAttribute('href')];
-      if (!group || !isMobileAdmin()) return;
+      if (!group) return;
       event.preventDefault();
-      openAdminModal(group, link);
+
+      if (isMobileAdmin()) {
+        if (group === 'dashboard') {
+          if (modal.classList.contains('open')) closeAdminModal({ restoreScroll: false });
+          applyGroupVisibility('dashboard');
+          setActiveNav(link);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          openAdminModal(group, link);
+        }
+        return;
+      }
+
+      applyGroupVisibility(group);
+      setActiveNav(link);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   });
 
@@ -583,8 +658,17 @@ socket.on('admin:playHistory', (history) => {
   });
 
   window.addEventListener('resize', () => {
-    if (!isMobileAdmin() && modal.classList.contains('open')) closeAdminModal({ restoreScroll: false });
+    if (!isMobileAdmin() && modal.classList.contains('open')) {
+      restoreCards();
+      modalBody.innerHTML = '';
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('admin-modal-open');
+      applyGroupVisibility(currentGroup || 'dashboard');
+    }
   });
+
+  applyGroupVisibility('dashboard');
 })();
 
 
