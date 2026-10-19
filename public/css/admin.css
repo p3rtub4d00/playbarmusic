@@ -557,3 +557,78 @@ body.admin-modal-open{
     font-size:.98rem;
   }
 }
+
+
+/* ===== Mercado Pago OAuth ===== */
+.mp-integration-card{
+  padding:16px;
+  border:1px solid #dbe4ef;
+  border-radius:12px;
+  background:linear-gradient(145deg,#f8fafc,#ffffff);
+}
+.mp-integration-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.mp-integration-head .form-label{margin-bottom:4px}
+.mp-integration-head .helper-text{margin:0;max-width:620px}
+.mp-status-badge{
+  flex:0 0 auto;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:.7rem;
+  line-height:1;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  border:1px solid #cbd5e1;
+  color:#64748b;
+  background:#f8fafc;
+}
+.mp-status-badge.is-connected{color:#047857;border-color:#a7f3d0;background:#ecfdf5}
+.mp-status-badge.is-disconnected{color:#b91c1c;border-color:#fecaca;background:#fef2f2}
+.mp-status-badge.is-warning{color:#a16207;border-color:#fde68a;background:#fffbeb}
+.mp-status-box{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+}
+.mp-status-icon{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#e0f2fe;
+  color:#0284c7;
+  font-size:1.1rem;
+}
+.mp-status-copy{min-width:0;display:grid;gap:3px}
+.mp-status-copy strong{font-size:.9rem;color:#0f172a}
+.mp-status-copy span{font-size:.8rem;color:#64748b;line-height:1.4}
+.mp-status-copy small{font-size:.74rem;color:#475569;font-weight:600}
+.mp-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.mp-security-note{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+  color:#64748b;
+  font-size:.72rem;
+}
+.mp-security-note i{color:#10b981}
+@media(max-width:560px){
+  .mp-integration-card{padding:12px}
+  .mp-integration-head{flex-direction:column}
+  .mp-status-badge{align-self:flex-start}
+  .mp-actions{display:grid;grid-template-columns:1fr}
+  .mp-actions .btn{width:100%}
+}
