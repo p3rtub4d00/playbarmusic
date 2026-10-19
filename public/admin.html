@@ -50,127 +50,173 @@
     <div class="dashboard-container">
         <!-- Menu Lateral (Sidebar) -->
         <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-icon"><i class="fa-solid fa-music"></i></div>
+                <div class="sidebar-brand-copy">
+                    <strong>PLAYBAR</strong>
+                    <small>PAINEL ADMINISTRATIVO</small>
+                </div>
+            </div>
+
             <nav class="sidebar-nav">
-                <ul class="nav-list">
-                    <li class="nav-item active"><a href="#player-section" class="nav-link"><i class="fa-solid fa-sliders"></i> Controle do Player</a></li>
-                    <li class="nav-item"><a href="#queue-section" class="nav-link"><i class="fa-solid fa-list-ul"></i> Fila & Buscas</a></li>
-                    <li class="nav-item"><a href="#autoplay-section" class="nav-link"><i class="fa-solid fa-robot"></i> Inatividade (Autoplay)</a></li>
-                    <li class="nav-item"><a href="#settings-section" class="nav-link"><i class="fa-solid fa-gear"></i> Configurações</a></li>
-                </ul>
-                <div class="nav-divider"></div>
+                <div class="nav-group">
+                    <span class="nav-group-label">MONITORAMENTO</span>
+                    <ul class="nav-list">
+                        <li class="nav-item active"><a href="#dashboard-section" class="nav-link"><i class="fa-solid fa-grid-2"></i> Visão Geral</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-group">
+                    <span class="nav-group-label">OPERAÇÃO</span>
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="#player-section" class="nav-link"><i class="fa-solid fa-sliders"></i> Player</a></li>
+                        <li class="nav-item"><a href="#queue-section" class="nav-link"><i class="fa-solid fa-list-ul"></i> Fila & Buscas</a></li>
+                        <li class="nav-item"><a href="#autoplay-section" class="nav-link"><i class="fa-solid fa-robot"></i> Autoplay</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-group">
+                    <span class="nav-group-label">GESTÃO</span>
+                    <ul class="nav-list">
+                        <li class="nav-item"><a href="#finance-section" class="nav-link"><i class="fa-solid fa-chart-column"></i> Financeiro</a></li>
+                        <li class="nav-item"><a href="#settings-section" class="nav-link"><i class="fa-solid fa-gear"></i> Configurações</a></li>
+                    </ul>
+                </div>
             </nav>
+
+            <div class="sidebar-footer">
+                <span class="sidebar-version"><i class="fa-solid fa-circle"></i> Sistema online</span>
+            </div>
         </aside>
 
         <!-- Conteúdo Principal -->
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar admin-topbar">
                 <div class="topbar-title">
-                    <h1>Painel Administrativo</h1>
-                    <p class="subtitle">Gestão em tempo real do ambiente sonoro.</p>
+                    <span class="topbar-eyebrow">PLAYBAR • OPERAÇÃO</span>
+                    <h1 id="adminPageTitle">Visão Geral</h1>
+                    <p class="subtitle" id="adminPageSubtitle">Acompanhe o funcionamento do bar em tempo real.</p>
                 </div>
-                
-                <!-- Faturamento do Dia no Topo -->
-                <div class="revenue-widget">
-                    <div class="revenue-info">
-                        <span class="revenue-label">Faturamento do Dia</span>
-                        <span class="revenue-value">R$ <span id="revenue">0.00</span></span>
-                    </div>
-                    <button id="resetRevenueBtn" class="btn-icon danger-icon" title="Zerar Faturamento"><i class="fa-solid fa-rotate-left"></i></button>
-                </div>
-                <div class="revenue-widget commission-widget">
-                    <div class="revenue-info">
-                        <span class="revenue-label">Comissão devida ao QG</span>
-                        <span class="revenue-value commission-value">R$ <span id="commissionAmount">--</span></span>
-                        <small id="commissionPercent" class="commission-percent">Percentual não informado</small>
-                    </div>
+
+                <div class="topbar-actions">
+                    <span class="topbar-live"><i></i> ONLINE</span>
+                    <button id="adminInstallBtn" class="admin-install-btn" type="button">
+                        <i class="fa-solid fa-download"></i> Instalar painel
+                    </button>
                 </div>
             </header>
 
-            <section class="card admin-overview-card" id="dashboard-section" data-admin-group="dashboard">
-                <div class="overview-head">
+            <section class="admin-page admin-page-overview" id="dashboard-section" data-admin-group="dashboard">
+                <div class="page-intro">
                     <div>
-                        <span class="overview-eyebrow">VISÃO GERAL</span>
-                        <h2>Operação do bar em tempo real</h2>
-                        <p>Acompanhe pedidos, telão, pagamentos e deixe tudo pronto para a noite.</p>
+                        <span class="section-kicker">RESUMO DA OPERAÇÃO</span>
+                        <h2>O que está acontecendo agora</h2>
+                        <p>As informações essenciais ficam aqui. Os detalhes estão separados no menu lateral.</p>
                     </div>
-                    <div class="overview-actions">
-                        <button id="dashOpenCustomerBtn" class="btn btn-secondary" type="button"><i class="fa-solid fa-mobile-screen"></i> Abrir cliente</button>
-                        <button id="dashOpenPlayerBtn" class="btn btn-primary" type="button"><i class="fa-solid fa-tv"></i> Abrir telão</button>
-                    </div>
+                    <button id="dashRefreshBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-rotate"></i> Atualizar</button>
                 </div>
 
-                <div class="overview-kpis">
-                    <div class="overview-kpi"><span class="kpi-icon"><i class="fa-solid fa-music"></i></span><div><small>Fila agora</small><strong id="dashQueueCount">0</strong></div></div>
-                    <div class="overview-kpi"><span class="kpi-icon"><i class="fa-solid fa-receipt"></i></span><div><small>Pedidos hoje</small><strong id="dashOrdersToday">0</strong></div></div>
-                    <div class="overview-kpi"><span class="kpi-icon"><i class="fa-solid fa-brazilian-real-sign"></i></span><div><small>Receita hoje</small><strong>R$ <span id="dashRevenueToday">0,00</span></strong></div></div>
-                    <div class="overview-kpi"><span class="kpi-icon"><i class="fa-solid fa-clock"></i></span><div><small>PIX pendentes</small><strong id="dashPendingPayments">0</strong></div></div>
+                <div class="overview-kpis pro-kpis">
+                    <article class="pro-kpi">
+                        <div class="pro-kpi-icon revenue"><i class="fa-solid fa-brazilian-real-sign"></i></div>
+                        <div><small>Faturamento do dia</small><strong>R$ <span id="revenue">0.00</span></strong><span>Pagamentos aprovados: R$ <b id="dashRevenueToday">0,00</b></span></div>
+                    </article>
+                    <article class="pro-kpi">
+                        <div class="pro-kpi-icon orders"><i class="fa-solid fa-receipt"></i></div>
+                        <div><small>Pedidos hoje</small><strong id="dashOrdersToday">0</strong><span><b id="dashPendingPayments">0</b> PIX pendente(s)</span></div>
+                    </article>
+                    <article class="pro-kpi">
+                        <div class="pro-kpi-icon queue"><i class="fa-solid fa-list-music"></i></div>
+                        <div><small>Músicas na fila</small><strong id="dashQueueCount">0</strong><span>Próximas solicitações</span></div>
+                    </article>
+                    <article class="pro-kpi">
+                        <div class="pro-kpi-icon commission"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <div><small>Comissão QG</small><strong>R$ <span id="commissionAmount">--</span></strong><span id="commissionPercent">Calculando...</span></div>
+                    </article>
                 </div>
 
-                <div class="overview-layout">
-                    <div class="overview-panel">
-                        <div class="overview-panel-head"><strong><i class="fa-solid fa-wave-square"></i> Agora no PlayBar</strong><span id="dashPlayerBadge" class="status-pill">Verificando</span></div>
-                        <div class="dash-now-playing">
-                            <span class="dash-disc"><i class="fa-solid fa-compact-disc"></i></span>
-                            <div><small>TOCANDO AGORA</small><strong id="dashNowPlaying">Nenhuma música tocando</strong></div>
+                <div class="overview-main-grid">
+                    <article class="pro-panel now-playing-panel">
+                        <div class="pro-panel-head">
+                            <div><span class="panel-kicker">PLAYER</span><h3>Tocando agora</h3></div>
+                            <span id="dashPlayerBadge" class="status-pill">Verificando</span>
                         </div>
-                        <div class="dash-controls">
-                            <button id="dashPauseBtn" class="btn btn-control" type="button"><i class="fa-solid fa-play-pause"></i> Pausar/Tocar</button>
+                        <div class="pro-now-playing">
+                            <div class="pro-disc"><i class="fa-solid fa-compact-disc"></i></div>
+                            <div class="pro-now-copy">
+                                <small>NO TELÃO</small>
+                                <strong id="dashNowPlaying">Nenhuma música tocando</strong>
+                                <span>Controle rápido sem sair da visão geral.</span>
+                            </div>
+                        </div>
+                        <div class="pro-control-row">
+                            <button id="dashPauseBtn" class="btn btn-control" type="button"><i class="fa-solid fa-play-pause"></i> Pausar / Tocar</button>
                             <button id="dashSkipBtn" class="btn btn-control" type="button"><i class="fa-solid fa-forward-step"></i> Pular</button>
+                            <button id="dashOpenPlayerBtn" class="btn btn-primary" type="button"><i class="fa-solid fa-tv"></i> Abrir telão</button>
                         </div>
-                    </div>
+                    </article>
 
-                    <div class="overview-panel">
-                        <div class="overview-panel-head"><strong><i class="fa-solid fa-signal"></i> Status do sistema</strong><button id="dashRefreshBtn" class="icon-refresh" type="button" title="Atualizar"><i class="fa-solid fa-rotate"></i></button></div>
-                        <div class="status-grid">
-                            <div class="status-row"><span>Servidor</span><b id="statusServer" class="status-dot-label ok"><i></i> Online</b></div>
-                            <div class="status-row"><span>Telão</span><b id="statusPlayer" class="status-dot-label"><i></i> Verificando</b></div>
-                            <div class="status-row"><span>Mercado Pago</span><b id="statusMp" class="status-dot-label"><i></i> Verificando</b></div>
-                            <div class="status-row"><span>QG Master</span><b id="statusQG" class="status-dot-label"><i></i> Verificando</b></div>
+                    <article class="pro-panel system-panel">
+                        <div class="pro-panel-head">
+                            <div><span class="panel-kicker">SAÚDE DO SISTEMA</span><h3>Conexões</h3></div>
                         </div>
-                    </div>
-
-                    <div class="overview-panel qr-panel">
-                        <div class="overview-panel-head"><strong><i class="fa-solid fa-qrcode"></i> QR Code do bar</strong><span class="status-pill soft">Cliente</span></div>
-                        <div id="adminQrCode" class="admin-qr"></div>
-                        <small id="adminQrUrl" class="admin-qr-url"></small>
-                        <div class="qr-actions">
-                            <button id="copyCustomerUrlBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-copy"></i> Copiar link</button>
-                            <button id="printQrBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <div class="status-grid pro-status-grid">
+                            <div class="status-row"><span><i class="fa-solid fa-server"></i> Servidor</span><b id="statusServer" class="status-dot-label ok"><i></i> Online</b></div>
+                            <div class="status-row"><span><i class="fa-solid fa-tv"></i> Telão</span><b id="statusPlayer" class="status-dot-label"><i></i> Verificando</b></div>
+                            <div class="status-row"><span><i class="fa-solid fa-wallet"></i> Mercado Pago</span><b id="statusMp" class="status-dot-label"><i></i> Verificando</b></div>
+                            <div class="status-row"><span><i class="fa-solid fa-cloud"></i> QG Master</span><b id="statusQG" class="status-dot-label"><i></i> Verificando</b></div>
                         </div>
-                    </div>
+                    </article>
                 </div>
 
-                <div class="dashboard-lower-grid">
-                    <div class="overview-panel onboarding-panel">
-                        <div class="overview-panel-head"><strong><i class="fa-solid fa-list-check"></i> Configuração inicial</strong><span id="onboardingProgress" class="status-pill soft">0/4</span></div>
-                        <div class="onboarding-list">
-                            <div class="onboarding-step" data-check="mercadoPago"><i class="fa-solid fa-circle-check"></i><span>Conectar Mercado Pago</span></div>
-                            <div class="onboarding-step" data-check="prices"><i class="fa-solid fa-circle-check"></i><span>Configurar preços</span></div>
-                            <div class="onboarding-step" data-check="screen"><i class="fa-solid fa-circle-check"></i><span>Abrir o telão</span></div>
-                            <div class="onboarding-step" data-check="firstOrder"><i class="fa-solid fa-circle-check"></i><span>Fazer primeiro pedido</span></div>
-                        </div>
+                <div class="overview-action-strip">
+                    <div class="overview-action-copy">
+                        <span class="action-icon"><i class="fa-solid fa-power-off"></i></span>
+                        <div><small>RECEBIMENTO</small><strong>Novos pedidos</strong><span>Pause as vendas sem desligar o telão.</span></div>
                     </div>
-
-                    <div class="overview-panel operation-panel">
-                        <div class="overview-panel-head"><strong><i class="fa-solid fa-power-off"></i> Receber pedidos</strong><span id="ordersModeBadge" class="status-pill">Verificando</span></div>
-                        <p>Pause novos pedidos sem desligar o player ou o telão.</p>
-                        <button id="toggleOrdersBtn" class="btn btn-primary full-width" type="button">Carregando...</button>
-                    </div>
+                    <span id="ordersModeBadge" class="status-pill">Verificando</span>
+                    <button id="toggleOrdersBtn" class="btn btn-secondary" type="button">Carregando...</button>
+                    <button id="dashOpenCustomerBtn" class="btn btn-secondary" type="button"><i class="fa-solid fa-mobile-screen"></i> Ver tela do cliente</button>
                 </div>
 
-                <div class="financial-panel">
-                    <div class="overview-panel-head financial-head">
-                        <div><strong><i class="fa-solid fa-chart-column"></i> Histórico financeiro</strong><small>Pedidos e pagamentos recebidos</small></div>
+                <div class="onboarding-compact">
+                    <div class="onboarding-title"><span><i class="fa-solid fa-list-check"></i> Configuração inicial</span><b id="onboardingProgress">0/4</b></div>
+                    <div class="onboarding-list compact">
+                        <div class="onboarding-step" data-check="mercadoPago"><i class="fa-solid fa-circle-check"></i><span>Mercado Pago</span></div>
+                        <div class="onboarding-step" data-check="prices"><i class="fa-solid fa-circle-check"></i><span>Preços</span></div>
+                        <div class="onboarding-step" data-check="screen"><i class="fa-solid fa-circle-check"></i><span>Telão</span></div>
+                        <div class="onboarding-step" data-check="firstOrder"><i class="fa-solid fa-circle-check"></i><span>Primeiro pedido</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="admin-page finance-page" id="finance-section" data-admin-group="finance">
+                <div class="page-intro">
+                    <div>
+                        <span class="section-kicker">GESTÃO FINANCEIRA</span>
+                        <h2>Pagamentos e faturamento</h2>
+                        <p>Consulte os pedidos pagos sem misturar informações financeiras com o controle do player.</p>
+                    </div>
+                    <button id="resetRevenueBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-rotate-left"></i> Zerar faturamento diário</button>
+                </div>
+
+                <div class="finance-summary-grid">
+                    <article class="finance-summary-card"><small>Total aprovado no período</small><strong>R$ <span id="financeTotal">0,00</span></strong></article>
+                    <article class="finance-summary-card"><small>Pedidos aprovados</small><strong id="financeCount">0 pedidos</strong></article>
+                </div>
+
+                <div class="financial-panel professional-finance">
+                    <div class="financial-toolbar">
+                        <div><strong>Histórico de pagamentos</strong><small>Até 200 registros recentes</small></div>
                         <div class="financial-filters">
                             <button class="finance-filter active" data-days="1" type="button">Hoje</button>
                             <button class="finance-filter" data-days="7" type="button">7 dias</button>
                             <button class="finance-filter" data-days="30" type="button">30 dias</button>
                         </div>
                     </div>
-                    <div class="financial-summary">Total aprovado: <strong>R$ <span id="financeTotal">0,00</span></strong> <span>•</span> <span id="financeCount">0 pedidos</span></div>
                     <div class="financial-table-wrap">
                         <table class="financial-table">
-                            <thead><tr><th>Horário</th><th>Pedido</th><th>Valor</th><th>Status</th></tr></thead>
+                            <thead><tr><th>Data / hora</th><th>Pedido</th><th>Valor</th><th>Status</th></tr></thead>
                             <tbody id="financeTableBody"><tr><td colspan="4">Carregando...</td></tr></tbody>
                         </table>
                     </div>
@@ -380,6 +426,29 @@
 
                         <hr class="divider">
 
+                        <!-- Acesso do cliente -->
+                        <div class="settings-group settings-subcard access-settings-card">
+                            <div class="settings-subcard-head">
+                                <div>
+                                    <label class="form-label"><i class="fa-solid fa-qrcode"></i> Acesso do cliente</label>
+                                    <p class="helper-text">Use este QR Code em mesas, cardápios ou no balcão.</p>
+                                </div>
+                                <span class="status-pill soft">QR DO BAR</span>
+                            </div>
+                            <div class="settings-qr-layout">
+                                <div id="adminQrCode" class="admin-qr"></div>
+                                <div class="settings-qr-copy">
+                                    <small id="adminQrUrl" class="admin-qr-url"></small>
+                                    <div class="qr-actions">
+                                        <button id="copyCustomerUrlBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-copy"></i> Copiar link</button>
+                                        <button id="printQrBtn" class="btn btn-secondary btn-sm" type="button"><i class="fa-solid fa-print"></i> Imprimir QR</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="divider">
+
                         <!-- Mercado Pago OAuth -->
                         <div class="settings-group mp-integration-card">
                             <div class="mp-integration-head">
@@ -538,7 +607,7 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register('/admin-sw.js')
                     .then(reg => console.log('SW registrado!', reg))
                     .catch(err => console.log('SW falhou:', err));
             });
