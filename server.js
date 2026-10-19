@@ -1111,6 +1111,15 @@ app.post("/create-payment", async (req, res) => {
       }
     }
 
+    const commercialConfig = await getConfig();
+    if (commercialConfig.ordersEnabled === false) {
+      return res.status(503).json({
+        ok: false,
+        paused: true,
+        error: 'Pedidos temporariamente pausados pelo estabelecimento.'
+      });
+    }
+
     let demoMode = false;
     if (MASTER_URL && CLIENT_ID) {
       try {
@@ -1179,25 +1188,36 @@ app.post("/create-payment", async (req, res) => {
       });
     }
 
-    const commercialConfig = await getConfig();
-    if (commercialConfig.ordersEnabled === false) {
-      return res.status(503).json({
-        ok: false,
-        paused: true,
-        error: 'Pedidos temporariamente pausados pelo estabelecimento.'
-      });
+    const trackCount = videos.length;
+    const configuredPackages = [
+      {
+        limit: Number(commercialConfig.package1Limit) || 3,
+        price: Number(commercialConfig.package1Price) || 2
+      },
+      {
+        limit: Number(commercialConfig.package2Limit) || 5,
+        price: Number(commercialConfig.package2Price) || 3
+      }
+    ];
+    const matchedPackage = configuredPackages.find(pkg => pkg.limit === trackCount);
+    if (!matchedPackage) {
+      return res.status(400).json({ ok: false, error: 'Quantidade de músicas não corresponde a um pacote disponível.' });
     }
 
-    const numericAmount = Number(amount);
+    const extraMessage = String(message || '').trim().length > 0
+      ? Math.max(0, Number(commercialConfig.messageCost) || 0)
+      : 0;
+    const numericAmount = Number((matchedPackage.price + extraMessage).toFixed(2));
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ ok: false, error: "Valor de pagamento inválido." });
+      return res.status(400).json({ ok: false, error: 'Preço do pacote inválido. Verifique as configurações do painel.' });
     }
+    const trustedDescription = `Pacote ${matchedPackage.limit} Música${matchedPackage.limit === 1 ? '' : 's'}${extraMessage > 0 ? ' + Mensagem' : ''}`;
 
     const notification_url = `https://${req.get('host')}/webhook`;
 
     const payment_data = {
       transaction_amount: numericAmount,
-      description: description,
+      description: trustedDescription,
       payment_method_id: "pix",
       payer: { email: "pagador@email.com" },
       notification_url: notification_url
@@ -1222,7 +1242,7 @@ app.post("/create-payment", async (req, res) => {
       socketId: socketId,
       userPhone: userPhone,
       amount: numericAmount,
-      description: description,
+      description: trustedDescription,
       message: message,
       status: 'pending',
       videos: videos
@@ -1518,6 +1538,11 @@ socket.on('disconnect', () => {
       const p1Price = Math.max(0.5, Math.min(999, Number(payload?.package1Price) || 2));
       const p2Price = Math.max(0.5, Math.min(999, Number(payload?.package2Price) || 3));
       const messageCost = Math.max(0, Math.min(999, Number(payload?.messageCost) || 0));
+
+      if (p1Limit === p2Limit) {
+        if (typeof callback === 'function') callback({ ok: false, error: 'Os dois pacotes precisam ter quantidades de músicas diferentes.' });
+        return;
+      }
 
       config.package1Limit = p1Limit;
       config.package1Price = Number(p1Price.toFixed(2));
