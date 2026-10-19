@@ -7,7 +7,6 @@ import youtubeSearchApi from "youtube-search-api";
 import mongoose from "mongoose";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from "crypto";
 import { promisify } from "util";
-import fetch from "node-fetch";
 
 dotenv.config();
 const scrypt = promisify(scryptCallback);
