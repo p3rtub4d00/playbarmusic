@@ -2,8 +2,10 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PlayBar - Player</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet"> 
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Icons+Round" rel="stylesheet"> 
   <style>
     :root{
       --bg:#07050d;
@@ -504,6 +506,9 @@
               const res = await fetch('/api/status');
               const data = await res.json();
               const overlay = document.getElementById('blockOverlay');
+              const demoBadge = document.getElementById('demoBadge');
+              const isDemo = data?.demo === true || data?.client?.demoMode === true;
+              if (demoBadge) demoBadge.style.display = isDemo ? 'flex' : 'none';
               
               if (data.ok && data.active === false) {
                   // Exibe a tela preta
