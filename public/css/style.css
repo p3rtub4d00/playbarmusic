@@ -634,3 +634,25 @@ footer strong{color:#9f91aa}
   .demo-screen-stage{gap:9px}
   .demo-eq{display:none}
 }
+
+
+/* Pedidos pausados pelo estabelecimento */
+.orders-paused{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:0 0 16px;
+  padding:13px 15px;
+  border:1px solid rgba(245,158,11,.28);
+  border-radius:16px;
+  background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(168,85,247,.07));
+  color:#f8fafc;
+}
+.orders-paused>.material-icons-round{color:#fbbf24;font-size:26px}
+.orders-paused div{display:grid;gap:2px;min-width:0}
+.orders-paused strong{font-size:12px}
+.orders-paused small{font-size:9px;line-height:1.45;color:#b8aabd}
+@media(max-width:560px){
+  .orders-paused{padding:11px 12px;border-radius:14px}
+  .orders-paused strong{font-size:11px}
+}
