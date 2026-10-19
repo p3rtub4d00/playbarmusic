@@ -2,247 +2,433 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>PlayBar - Player</title> 
+  <title>PlayBar - Player</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet"> 
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: black;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-    }
-    #player {
-      width: 100%;
-      height: 100vh;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 1;
-    }
-    
-    /* --- FAIXA PROMOCIONAL (RODAPÉ) --- */
-    #promo-banner {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      background-color: rgba(0, 0, 0, 0.85); 
-      color: #ffd700; 
-      padding: 15px 0; 
-      font-size: 1.8rem; 
-      font-weight: bold;
-      text-transform: uppercase;
-      z-index: 10; 
-      white-space: nowrap; 
-      overflow: hidden; 
-      border-top: 4px solid #e67e22;
+    :root{
+      --bg:#07050d;
+      --panel:rgba(12,9,18,.78);
+      --panel-strong:rgba(8,6,13,.92);
+      --line:rgba(255,255,255,.12);
+      --text:#f8f7fb;
+      --muted:#b5aabd;
+      --purple:#a855f7;
+      --purple-2:#7c3aed;
+      --cyan:#48e1e8;
+      --green:#7cf5a3;
+      --danger:#ef4444;
     }
 
-    #promo-text-content {
-        display: inline-block; 
-        padding-left: 100%; 
+    *{box-sizing:border-box}
+    html,body{
+      height:100%;
+      margin:0;
+      background:var(--bg);
+      overflow:hidden;
+      font-family:'Inter',Arial,sans-serif;
+      color:var(--text);
     }
 
-    #promo-banner.scrolling #promo-text-content {
-        animation: marquee 40s linear infinite; 
+    #player{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100vh;
+      z-index:1;
+      background:#000;
     }
 
-    @keyframes marquee {
-      0%   { transform: translate(0, 0); } 
-      100% { transform: translate(-200%, 0); } 
+    /* Tela de espera elegante, sem interferir no player */
+    #idle-screen{
+      position:fixed;
+      inset:0;
+      z-index:4;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:7vh 7vw 13vh;
+      background:
+        radial-gradient(circle at 72% 38%,rgba(124,58,237,.24),transparent 30%),
+        radial-gradient(circle at 28% 72%,rgba(34,211,238,.12),transparent 28%),
+        linear-gradient(145deg,#0b0711 0%,#09070f 50%,#06050a 100%);
+      opacity:1;
+      visibility:visible;
+      transition:opacity .35s ease,visibility .35s ease;
+    }
+    #idle-screen.hidden{
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+    .idle-shell{
+      width:min(980px,78vw);
+      display:grid;
+      grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);
+      gap:4vw;
+      align-items:center;
+    }
+    .idle-copy{position:relative;z-index:2}
+    .idle-kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:9px;
+      padding:8px 12px;
+      border:1px solid rgba(168,85,247,.32);
+      border-radius:999px;
+      background:rgba(168,85,247,.08);
+      color:#d8b4fe;
+      font-size:clamp(10px,1vw,14px);
+      font-weight:900;
+      letter-spacing:.12em;
+    }
+    .idle-kicker i{
+      width:8px;height:8px;border-radius:50%;
+      background:var(--cyan);
+      box-shadow:0 0 15px var(--cyan);
+    }
+    .idle-copy h1{
+      margin:18px 0 14px;
+      max-width:680px;
+      font-size:clamp(42px,5.4vw,82px);
+      line-height:.98;
+      letter-spacing:-.055em;
+    }
+    .idle-copy h1 span{
+      background:linear-gradient(90deg,#c65cff,#55e8ee);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
+    .idle-copy p{
+      max-width:660px;
+      margin:0;
+      color:#b7aebe;
+      font-size:clamp(15px,1.45vw,23px);
+      line-height:1.55;
+    }
+    .idle-tip{
+      margin-top:24px;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:#ddd4e4;
+      font-size:clamp(12px,1.1vw,17px);
+      font-weight:700;
+    }
+    .idle-tip .material-icons-round{color:var(--cyan)}
+    .idle-art{
+      position:relative;
+      min-height:300px;
+      display:grid;
+      place-items:center;
+    }
+    .idle-vinyl{
+      width:min(28vw,330px);
+      aspect-ratio:1;
+      border-radius:50%;
+      position:relative;
+      background:
+        radial-gradient(circle at center,#0b0910 0 7%,#a855f7 7% 12%,#0a080f 12% 18%,transparent 18%),
+        repeating-radial-gradient(circle at center,#111018 0 5px,#09080d 6px 10px);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:
+        0 0 0 1px rgba(168,85,247,.08),
+        0 0 80px rgba(124,58,237,.25),
+        inset 0 0 40px rgba(255,255,255,.03);
+      animation:vinylSpin 13s linear infinite;
+    }
+    .idle-vinyl::before{
+      content:'PLAYBAR';
+      position:absolute;
+      inset:35%;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      color:#fff;
+      font-size:clamp(9px,.8vw,13px);
+      font-weight:900;
+      letter-spacing:.08em;
+      background:linear-gradient(145deg,#7c3aed,#1fbfca);
+      box-shadow:0 0 30px rgba(72,225,232,.2);
+    }
+    .idle-note{
+      position:absolute;
+      color:#d05fff;
+      font-size:clamp(30px,3vw,54px);
+      filter:drop-shadow(0 0 14px rgba(208,95,255,.45));
+      animation:noteFloat 3.2s ease-in-out infinite alternate;
+    }
+    .idle-note.one{left:4%;top:12%}
+    .idle-note.two{right:3%;bottom:12%;color:var(--cyan);animation-delay:-1.2s}
+    @keyframes vinylSpin{to{transform:rotate(360deg)}}
+    @keyframes noteFloat{from{transform:translateY(-7px) rotate(-7deg)}to{transform:translateY(9px) rotate(8deg)}}
+
+    /* Selo apenas no modo demo */
+    #demoBadge{
+      position:fixed;
+      top:22px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:35;
+      display:none;
+      align-items:center;
+      gap:8px;
+      padding:9px 14px;
+      border:1px solid rgba(192,132,252,.42);
+      border-radius:999px;
+      background:rgba(12,9,18,.76);
+      backdrop-filter:blur(16px);
+      color:#e9d5ff;
+      box-shadow:0 10px 30px rgba(0,0,0,.28),0 0 22px rgba(168,85,247,.18);
+      font-size:clamp(10px,.8vw,13px);
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    #demoBadge::before{
+      content:'';
+      width:8px;height:8px;border-radius:50%;
+      background:#c084fc;
+      box-shadow:0 0 13px #a855f7;
     }
 
-    /* --- LISTA DE PRÓXIMAS (CANTO SUPERIOR DIREITO) --- */
-    #queue-overlay {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      width: 300px;
-      background-color: rgba(0, 0, 0, 0.7);
-      border-radius: 10px;
-      padding: 15px;
-      color: white;
-      z-index: 20; 
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      display: none; 
+    /* QR Code */
+    #qr-overlay{
+      position:fixed;
+      top:22px;
+      left:22px;
+      z-index:20;
+      width:clamp(155px,12.5vw,210px);
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:linear-gradient(145deg,rgba(16,12,23,.88),rgba(7,6,11,.82));
+      backdrop-filter:blur(16px);
+      box-shadow:0 18px 45px rgba(0,0,0,.38),0 0 26px rgba(124,58,237,.14);
+    }
+    #qr-overlay p{
+      margin:0 0 10px;
+      color:#fff;
+      font-size:clamp(11px,.9vw,15px);
+      line-height:1.25;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+    }
+    #qr-overlay p span{color:var(--cyan)}
+    #qr-img{
+      width:clamp(120px,9vw,155px);
+      aspect-ratio:1;
+      border:7px solid white;
+      border-radius:12px;
+      background:#fff;
+    }
+    #qr-url{
+      margin-top:9px;
+      color:#a99fad;
+      font-size:clamp(9px,.7vw,12px);
+      line-height:1.35;
     }
 
-    #queue-overlay h3 {
-      margin: 0 0 10px 0;
-      font-size: 1.2rem;
-      color: #e67e22;
-      border-bottom: 1px solid #555;
-      padding-bottom: 5px;
-      text-align: center;
+    /* Próximas músicas */
+    #queue-overlay{
+      position:fixed;
+      top:22px;
+      right:22px;
+      width:clamp(270px,24vw,420px);
+      z-index:20;
+      display:none;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:linear-gradient(145deg,rgba(16,12,23,.88),rgba(7,6,11,.82));
+      backdrop-filter:blur(16px);
+      box-shadow:0 18px 45px rgba(0,0,0,.38),0 0 26px rgba(72,225,232,.08);
+    }
+    #queue-overlay h3{
+      margin:0;
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      color:#fff;
+      font-size:clamp(12px,1vw,16px);
+      font-weight:900;
+      letter-spacing:.03em;
+    }
+    #queue-overlay h3::before{
+      content:'';
+      width:8px;height:8px;border-radius:50%;
+      background:var(--cyan);
+      box-shadow:0 0 12px var(--cyan);
+    }
+    #queue-list{list-style:none;padding:8px;margin:0}
+    #queue-list li{
+      min-width:0;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:0;
+      padding:9px 10px;
+      border-radius:11px;
+      color:#e8e2ed;
+      font-size:clamp(11px,.85vw,14px);
+      border:1px solid transparent;
+    }
+    #queue-list li+li{margin-top:4px}
+    #queue-list li .song-number{
+      width:24px;
+      flex:0 0 24px;
+      color:#776c80;
+      font-weight:900;
+      font-variant-numeric:tabular-nums;
+    }
+    #queue-list li .song-title{
+      min-width:0;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      flex:1;
+    }
+    #queue-list li.is-customer{
+      color:#fff;
+      border-color:rgba(72,225,232,.16);
+      background:linear-gradient(90deg,rgba(72,225,232,.09),rgba(168,85,247,.06));
+    }
+    #queue-list li.is-customer .song-number{color:var(--cyan)}
+    #queue-list li.is-customer .song-title::after{
+      content:'  • PEDIDO';
+      color:#c084fc;
+      font-size:.72em;
+      font-weight:900;
     }
 
-    #queue-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
+    /* Novo pedido */
+    #notification-popup{
+      position:fixed;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%) scale(.88);
+      z-index:100;
+      display:block;
+      width:min(720px,78vw);
+      padding:28px 34px;
+      text-align:center;
+      border:1px solid rgba(72,225,232,.35);
+      border-radius:26px;
+      background:
+        radial-gradient(circle at 50% 0%,rgba(168,85,247,.22),transparent 40%),
+        rgba(8,6,13,.94);
+      backdrop-filter:blur(18px);
+      box-shadow:0 28px 80px rgba(0,0,0,.58),0 0 60px rgba(72,225,232,.14);
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+      transition:opacity .28s ease,transform .34s cubic-bezier(.2,.8,.2,1),visibility .28s;
+    }
+    #notification-popup.show{
+      opacity:1;
+      visibility:visible;
+      transform:translate(-50%,-50%) scale(1);
+    }
+    #notification-popup h2{
+      margin:0 0 12px;
+      color:var(--cyan);
+      font-size:clamp(24px,2.4vw,42px);
+      text-transform:uppercase;
+      letter-spacing:-.025em;
+      text-shadow:0 0 22px rgba(72,225,232,.26);
+    }
+    #notification-popup p{
+      margin:0;
+      color:#fff;
+      font-size:clamp(20px,2vw,34px);
+      line-height:1.2;
+      font-weight:900;
+    }
+    #notification-popup span{
+      display:block;
+      margin-top:12px;
+      color:#b3a7bb;
+      font-size:clamp(12px,1vw,16px);
     }
 
-    #queue-list li {
-      margin-bottom: 8px;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
+    /* Faixa promocional */
+    #promo-banner{
+      position:fixed;
+      left:18px;
+      right:18px;
+      bottom:16px;
+      z-index:18;
+      height:clamp(54px,5.2vw,78px);
+      display:flex;
+      align-items:center;
+      overflow:hidden;
+      border:1px solid rgba(168,85,247,.24);
+      border-radius:18px;
+      background:
+        linear-gradient(90deg,rgba(124,58,237,.24),rgba(10,8,14,.9) 28%,rgba(10,8,14,.9) 72%,rgba(34,211,238,.17));
+      backdrop-filter:blur(18px);
+      box-shadow:0 15px 40px rgba(0,0,0,.36);
+      color:#f5f1f8;
+      font-size:clamp(18px,1.65vw,28px);
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.025em;
+      white-space:nowrap;
+    }
+    #promo-banner::before{
+      content:'PLAYBAR';
+      flex:0 0 auto;
+      align-self:stretch;
+      display:flex;
+      align-items:center;
+      padding:0 18px;
+      margin-right:6px;
+      color:#fff;
+      font-size:.58em;
+      letter-spacing:.14em;
+      background:linear-gradient(135deg,#8b36e8,#1fbfca);
+    }
+    #promo-text-content{display:inline-block;padding-left:3vw;padding-right:3vw}
+    #promo-banner.scrolling #promo-text-content{padding-left:100%;animation:marquee 38s linear infinite}
+    @keyframes marquee{
+      0%{transform:translateX(0)}
+      100%{transform:translateX(-180%)}
     }
 
-    #queue-list li .song-number {
-      font-weight: bold;
-      margin-right: 8px;
-      color: #aaa;
+    /* Tela de bloqueio */
+    #blockOverlay{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      background:
+        radial-gradient(circle at 50% 20%,rgba(239,68,68,.09),transparent 28%),
+        #07050d;
+      display:none;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      z-index:99999;
+      text-align:center;
+      padding:20px;
+      color:#fff;
     }
+    #blockOverlay h1{font-size:clamp(34px,4vw,58px);color:#ff6670;margin:0 0 15px}
+    #blockOverlay p{font-size:clamp(14px,1.35vw,20px);color:#a99fad;max-width:660px;line-height:1.6}
 
-    #queue-list li .song-title {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex-grow: 1;
+    @media(max-width:900px){
+      #qr-overlay{top:12px;left:12px}
+      #queue-overlay{top:12px;right:12px}
+      #promo-banner{left:10px;right:10px;bottom:10px}
+      .idle-shell{width:88vw;grid-template-columns:1fr .7fr}
     }
-
-    #queue-list li.is-customer {
-      color: #00ffcc;
-    }
-    
-    #queue-list li.is-customer .song-title::after {
-      content: ' ★'; 
-      color: #ffd700;
-    }
-
-    /* --- QR CODE (CANTO SUPERIOR ESQUERDO) --- */
-    #qr-overlay {
-      position: fixed;
-      top: 20px;
-      left: 20px; 
-      width: auto;
-      background-color: rgba(0, 0, 0, 0.7); 
-      border-radius: 10px;
-      padding: 15px;
-      color: white;
-      z-index: 20;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    #qr-overlay p {
-        margin: 0 0 10px 0;
-        color: #e67e22;
-        font-weight: bold;
-        font-size: 1.1rem;
-        text-transform: uppercase;
-    }
-
-    #qr-img {
-        width: 130px;
-        height: 130px;
-        border: 2px solid white;
-        border-radius: 5px;
-    }
-    
-    #qr-url {
-        margin-top: 5px;
-        font-size: 0.8rem;
-        color: #ccc;
-    }
-
-    /* --- POPUP DE NOVO PEDIDO (CENTRO) --- */
-    #notification-popup {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) scale(0.8);
-        background: rgba(0, 0, 0, 0.9);
-        border: 4px solid #00ffcc;
-        border-radius: 20px;
-        padding: 30px 50px;
-        color: #fff;
-        text-align: center;
-        z-index: 100;
-        display: none;
-        box-shadow: 0 0 40px rgba(0, 255, 204, 0.6);
-        opacity: 0;
-        transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    #notification-popup.show {
-        display: block;
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-
-    #notification-popup h2 {
-        color: #00ffcc;
-        font-size: 2.5rem;
-        margin: 0 0 15px 0;
-        text-transform: uppercase;
-        text-shadow: 0 0 10px rgba(0, 255, 204, 0.8);
-    }
-
-    #notification-popup p {
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: #fff;
-        margin: 0;
-    }
-
-    #notification-popup span {
-        display: block;
-        font-size: 1.2rem;
-        color: #aaa;
-        margin-top: 10px;
-    }
-
-    /* --- CONTAINER DE REAÇÕES --- */
-    #reaction-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 50;
-        overflow: hidden;
-    }
-
-    .floating-emoji {
-        position: absolute;
-        bottom: -50px;
-        font-size: 3rem;
-        animation: floatUp 4s linear forwards;
-        opacity: 0.8;
-    }
-
-    @keyframes floatUp {
-        0% { transform: translateY(0) scale(1); opacity: 1; }
-        50% { opacity: 0.8; }
-        100% { transform: translateY(-120vh) scale(1.5); opacity: 0; }
-    }
-
-    /* --- TELA DE BLOQUEIO / SUSPENSÃO --- */
-    #blockOverlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #020617;
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 99999;
-      text-align: center;
-      padding: 20px;
-    }
-    #blockOverlay h1 { font-size: 3rem; color: #ef4444; margin-bottom: 15px; }
-    #blockOverlay p { font-size: 1.2rem; color: #94a3b8; max-width: 600px; line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -265,26 +451,41 @@
 
   <div id="player"></div>
 
+  <div id="demoBadge">Modo Demo</div>
+
+  <div id="idle-screen">
+    <div class="idle-shell">
+      <div class="idle-copy">
+        <span class="idle-kicker"><i></i> PLAYBAR MUSIC</span>
+        <h1>A próxima música<br>pode ser <span>a sua.</span></h1>
+        <p>Escaneie o QR Code, escolha suas músicas e acompanhe seu pedido entrando na fila do bar.</p>
+        <div class="idle-tip"><span class="material-icons-round">qr_code_scanner</span> Aponte a câmera do celular para começar</div>
+      </div>
+      <div class="idle-art" aria-hidden="true">
+        <span class="material-icons-round idle-note one">music_note</span>
+        <div class="idle-vinyl"></div>
+        <span class="material-icons-round idle-note two">queue_music</span>
+      </div>
+    </div>
+  </div>
+
   <div id="qr-overlay">
-      <p>Escolha sua música</p>
-      <img id="qr-img" src="" alt="QR Code">
-      <div id="qr-url">Aponte a câmera para pedir</div>
+      <p>Peça sua <span>música</span></p>
+      <img id="qr-img" src="" alt="QR Code para pedir música">
+      <div id="qr-url">Escaneie e escolha pelo celular</div>
   </div>
 
   <div id="queue-overlay">
-      <h3>Próximas Músicas</h3>
+      <h3>Próximas na fila</h3>
       <ul id="queue-list"></ul>
   </div>
 
   <div id="notification-popup">
-      <h2>✨ Novo Pedido Aceito! ✨</h2>
+      <h2>Novo pedido na fila</h2>
       <p id="notif-song-title">Nome da Música Aqui</p>
-      <span>Obrigado pela preferência! 🍻</span>
+      <span>Seu pedido foi recebido e já entrou na sequência.</span>
   </div>
-
-  <div id="reaction-container"></div>
-
-  <div id="promo-banner">
+<div id="promo-banner">
       <span id="promo-text-content">Bem-vindo ao PlayBar!</span>
   </div>
 
