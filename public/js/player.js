@@ -112,7 +112,7 @@ window.addEventListener('load', () => {
     if (qrImg) {
         const orderUrl = 'https://playbarmusic.onrender.com';
         qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(orderUrl)}`;
-        console.log(`[Player.js] QR Code gerado para: ${currentUrl}`);
+        console.log(`[Player.js] QR Code gerado para: ${orderUrl}`);
     }
     resetBotTimer();
 });
@@ -234,6 +234,7 @@ socket.on('player:setVolume', (data) => {
 });
 
 socket.on('player:stop', () => {
+  setIdleScreen(true);
   if (!isPlayerReady) return;
   isLoadingNewVideo = false;
   hasReportedVideoEnd = true;
