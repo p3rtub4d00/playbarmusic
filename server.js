@@ -2,7 +2,6 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
-import { MercadoPagoConfig, Payment } from "mercadopago";
 import youtubeSearchApi from "youtube-search-api";
 import mongoose from "mongoose";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
@@ -883,6 +882,79 @@ app.get("/search", async (req, res) => {
   }
 });
 
+async function approveLocalPayment(paymentId, source = 'mercadopago') {
+  const dbPayment = await PaymentModel.findOneAndUpdate(
+    { mpPaymentId: String(paymentId), status: { $ne: 'approved' } },
+    { $set: { status: 'approved' } },
+    { new: true }
+  );
+
+  if (!dbPayment) return false;
+
+  console.log(`[Server] Pagamento ${paymentId} APROVADO via ${source}.`);
+
+  const config = await getConfig();
+  config.dailyRevenue += Number(dbPayment.amount) || 0;
+  config.totalSales += Number(dbPayment.amount) || 0;
+  await config.save();
+  io.emit('admin:updateRevenue', config.dailyRevenue);
+
+  if (MASTER_URL && CLIENT_ID) {
+    try {
+      await fetch(`${MASTER_URL}/api/report-revenue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: CLIENT_ID,
+          dailyRevenue: config.dailyRevenue,
+          totalSales: config.totalSales
+        })
+      });
+    } catch (syncErr) {
+      console.error('[Server] Erro ao enviar faturamento para o QG Mestre:', syncErr.message);
+    }
+  }
+
+  isCustomerPlaying = true;
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = null;
+
+  const customerVideos = [];
+  for (const v of dbPayment.videos || []) {
+    if (!(await isTitleBlocked(v.title))) {
+      customerVideos.push({
+        videoId: v.id,
+        title: v.title,
+        isCustomer: true,
+        message: dbPayment.message,
+        userPhone: dbPayment.userPhone || null,
+        mpPaymentId: dbPayment.mpPaymentId || null,
+        priority: 1
+      });
+    }
+  }
+
+  if (customerVideos.length > 0) {
+    await QueueModel.insertMany(customerVideos);
+    io.emit('player:newOrderNotification', { title: customerVideos[0].title });
+  }
+
+  if (nowPlayingInfo && !nowPlayingInfo.isCustomer) {
+    playNextInQueue();
+  } else if (!nowPlayingInfo) {
+    playNextInQueue();
+  } else {
+    broadcastPlayerState();
+  }
+
+  if (dbPayment.socketId) {
+    const targetSocket = io.sockets.sockets.get(dbPayment.socketId);
+    if (targetSocket) targetSocket.emit('paymentConfirmed');
+  }
+
+  return true;
+}
+
 app.post("/create-payment", async (req, res) => {
   try {
     const { videos, amount, description, message, socketId, userPhone } = req.body;
@@ -979,11 +1051,18 @@ app.post("/create-payment", async (req, res) => {
       notification_url: notification_url
     };
 
-    const payment = await getMercadoPagoPaymentClient();
-    const result = await payment.create({ body: payment_data });
+    const result = await mercadoPagoApiRequest('/v1/payments', {
+      method: 'POST',
+      idempotencyKey: randomIdempotencyKey(),
+      body: payment_data
+    });
 
-    if (!result?.point_of_interaction?.transaction_data?.qr_code_base64) {
-      throw new Error('Falha ao gerar QR Code.');
+    if (
+      !result?.id ||
+      !result?.point_of_interaction?.transaction_data?.qr_code ||
+      !result?.point_of_interaction?.transaction_data?.qr_code_base64
+    ) {
+      throw new Error('O Mercado Pago não retornou os dados completos do PIX.');
     }
 
     await PaymentModel.create({
@@ -1011,111 +1090,82 @@ app.post("/create-payment", async (req, res) => {
 
 app.get('/payment-status/:paymentId', async (req, res) => {
   try {
-    const { paymentId } = req.params;
+    const paymentId = String(req.params.paymentId || '').trim();
     if (!paymentId) return res.status(400).json({ ok: false, error: 'paymentId obrigatório' });
 
-    const payment = await PaymentModel.findOne({ mpPaymentId: paymentId.toString() }).select('status').lean();
-    if (!payment) return res.status(404).json({ ok: false, error: 'Pagamento não encontrado' });
+    let localPayment = await PaymentModel.findOne({ mpPaymentId: paymentId }).select('status').lean();
+    if (!localPayment) return res.status(404).json({ ok: false, error: 'Pagamento não encontrado' });
 
-    res.json({ ok: true, status: payment.status });
+    if (localPayment.status === 'pending' && !paymentId.startsWith('demo-')) {
+      try {
+        const remotePayment = await mercadoPagoApiRequest('/v1/payments/' + encodeURIComponent(paymentId));
+        const remoteStatus = String(remotePayment?.status || '').toLowerCase();
+
+        if (remoteStatus === 'approved') {
+          await approveLocalPayment(paymentId, 'consulta automática');
+          localPayment = { status: 'approved' };
+        } else if (['rejected', 'cancelled', 'refunded', 'charged_back'].includes(remoteStatus)) {
+          await PaymentModel.updateOne(
+            { mpPaymentId: paymentId, status: 'pending' },
+            { $set: { status: remoteStatus } }
+          );
+          localPayment = { status: remoteStatus };
+        }
+      } catch (remoteError) {
+        console.warn('[Mercado Pago] Falha temporária ao reconciliar pagamento:', remoteError.message);
+      }
+    }
+
+    res.json({ ok: true, status: localPayment.status });
   } catch (error) {
     res.status(500).json({ ok: false, error: 'Erro ao consultar pagamento' });
   }
 });
 
-// --- Webhook com Sincronização Automática de Faturamento com o QG Mestre ---
+// --- Webhook Mercado Pago: assinatura validada + confirmação idempotente ---
 app.post("/webhook", async (req, res) => {
-  try {
-    const notification = req.body;
-    let paymentId = null;
+  const notification = req.body || {};
+  const paymentId = String(
+    req.query?.['data.id'] ||
+    notification?.data?.id ||
+    notification?.id ||
+    ''
+  ).trim();
 
-    if (notification?.data?.id) paymentId = notification.data.id;
-    else if (notification?.type === 'payment') paymentId = notification.data.id;
-    else if (notification?.resource) {
-        const parts = notification.resource.split('/');
-        paymentId = parts[parts.length - 1];
+  if (!paymentId) return res.sendStatus(200);
+
+  if (MP_WEBHOOK_SECRET) {
+    const signatureValid = validateMercadoPagoWebhookSignature({
+      secret: MP_WEBHOOK_SECRET,
+      xSignature: req.get('x-signature') || '',
+      xRequestId: req.get('x-request-id') || '',
+      dataId: paymentId
+    });
+
+    if (!signatureValid) {
+      console.warn('[Mercado Pago] Webhook rejeitado por assinatura inválida.');
+      return res.status(401).json({ ok: false, error: 'Webhook não autorizado.' });
     }
-    if (!paymentId) return res.sendStatus(200);
-
-    const payment = await getMercadoPagoPaymentClient();
-    const mpPayment = await payment.get({ id: paymentId });
-
-    if (mpPayment.status === 'approved') {
-      const dbPayment = await PaymentModel.findOneAndUpdate(
-        { mpPaymentId: paymentId.toString(), status: { $ne: 'approved' } },
-        { $set: { status: 'approved' } },
-        { new: true }
-      );
-
-      if (dbPayment) {
-        console.log(`[Server] Pagamento ${paymentId} APROVADO via Webhook.`);
-
-        const config = await getConfig();
-        config.dailyRevenue += dbPayment.amount;
-        config.totalSales += dbPayment.amount; // ATUALIZA O ACUMULADO
-        await config.save();
-        io.emit('admin:updateRevenue', config.dailyRevenue);
-
-        // SINCRONIZAÇÃO IMEDIATA COM O PAINEL MESTRE (QG)
-        if (MASTER_URL && CLIENT_ID) {
-            try {
-                await fetch(`${MASTER_URL}/api/report-revenue`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        client_id: CLIENT_ID, 
-                        dailyRevenue: config.dailyRevenue,
-                        totalSales: config.totalSales 
-                    })
-                });
-                console.log('[Server] Faturamento sincronizado com o QG Mestre com sucesso!');
-            } catch (syncErr) {
-                console.error('[Server] Erro ao enviar faturamento para o QG Mestre:', syncErr.message);
-            }
-        }
-
-        isCustomerPlaying = true;
-        if (inactivityTimer) clearTimeout(inactivityTimer);
-        inactivityTimer = null;
-
-        const customerVideos = [];
-        for (const v of dbPayment.videos) {
-            if (!(await isTitleBlocked(v.title))) {
-                customerVideos.push({
-                  videoId: v.id, 
-                  title: v.title, 
-                  isCustomer: true, 
-                  message: dbPayment.message,
-                  userPhone: dbPayment.userPhone || null,
-                  mpPaymentId: dbPayment.mpPaymentId || null,
-                  priority: 1 
-                });
-            }
-        }
-
-        if (customerVideos.length > 0) {
-            await QueueModel.insertMany(customerVideos);
-            io.emit('player:newOrderNotification', { title: customerVideos[0].title });
-        }
-
-        if (nowPlayingInfo && !nowPlayingInfo.isCustomer) {
-           playNextInQueue();
-        } else {
-           if (!nowPlayingInfo) playNextInQueue();
-           else broadcastPlayerState();
-        }
-
-        if (dbPayment.socketId) {
-          const targetSocket = io.sockets.sockets.get(dbPayment.socketId);
-          if (targetSocket) targetSocket.emit('paymentConfirmed');
-        }
-      }
-    }
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("[Server] Webhook Error:", err);
-    res.sendStatus(500);
   }
+
+  // Responde rápido; a confirmação real sempre é consultada na API do Mercado Pago.
+  res.sendStatus(200);
+
+  Promise.resolve().then(async () => {
+    const mpPayment = await mercadoPagoApiRequest('/v1/payments/' + encodeURIComponent(paymentId));
+    const remoteStatus = String(mpPayment?.status || '').toLowerCase();
+
+    if (remoteStatus === 'approved') {
+      await approveLocalPayment(paymentId, 'webhook');
+    } else if (['rejected', 'cancelled', 'refunded', 'charged_back'].includes(remoteStatus)) {
+      await PaymentModel.updateOne(
+        { mpPaymentId: paymentId, status: 'pending' },
+        { $set: { status: remoteStatus } }
+      );
+    }
+  }).catch((err) => {
+    console.error('[Server] Erro ao processar webhook Mercado Pago:', err.message);
+  });
 });
 
 io.on("connection", async (socket) => {
