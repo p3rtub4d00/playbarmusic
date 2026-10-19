@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0b0712">
   <title>PlayBar Music</title>
-  <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/images/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -17,18 +15,6 @@
 <body>
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
-
-  <div id="installInvite" class="install-invite hidden" role="dialog" aria-label="Instalar PlayBar">
-    <div class="install-icon"><img src="/images/playbar-logo.webp" alt="PlayBar Music"></div>
-    <div class="install-copy">
-      <strong>Instale o PlayBar</strong>
-      <span>Acesse mais rápido direto da tela inicial.</span>
-    </div>
-    <div class="install-actions">
-      <button id="dismissInstall" type="button" class="btn-ghost-small">Agora não</button>
-      <button id="installAppBtn" type="button" class="btn-install">Instalar</button>
-    </div>
-  </div>
 
   <div class="app-shell">
     <header class="topbar">
@@ -142,6 +128,11 @@
             <span class="wizard-step" data-step="4"><b>4</b><em>PIX</em></span>
             <span class="wizard-step" data-step="5"><b>5</b><em>Fila</em></span>
           </div>
+        </div>
+
+        <div id="ordersPausedBanner" class="orders-paused hidden" role="status">
+          <span class="material-icons-round">pause_circle</span>
+          <div><strong>Pedidos temporariamente pausados</strong><small>O telão continua funcionando. Aguarde o estabelecimento reabrir os pedidos.</small></div>
         </div>
 
         <section id="step-1" class="wizard-screen">
@@ -362,10 +353,5 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
   <script src="js/main.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
-    }
-  </script>
 </body>
 </html>
