@@ -43,6 +43,7 @@ const demoCenter = $('demo-center');
 const demoNowPlaying = $('demo-now-playing');
 const demoQueueCount = $('demo-queue-count');
 const demoScreenStatus = $('demo-screen-status');
+const ordersPausedBanner = $('ordersPausedBanner');
 
 // Mensagem dedicada
 const messageModal = $('messageModal');
@@ -54,7 +55,7 @@ const modalMessageInputArea = $('modalMessageInputArea');
 const modalMessageText = $('modalMessageText');
 const modalBtnConfirm = $('modalBtnConfirm');
 const messageCharCount = $('messageCharCount');
-const MESSAGE_COST = 1.00;
+let MESSAGE_COST = 1.00;
 
 // Perfil
 const navHome = $('nav-home');
@@ -72,11 +73,6 @@ const historyLoading = $('history-loading');
 const logoutBtn = $('logoutBtn');
 const backToHomeBtn = $('backToHomeBtn');
 
-// Instalação
-const installInvite = $('installInvite');
-const installBtn = $('installAppBtn');
-const dismissInstall = $('dismissInstall');
-
 // --- Estado ---
 let selectedPackage = { limit: 3, price: 2.00, description: 'Pacote 3 Músicas' };
 let selectedVideos = [];
@@ -87,9 +83,9 @@ let currentUserPhone = localStorage.getItem('userPhone');
 let currentStep = 1;
 let currentPaymentId = null;
 let paymentPollingInterval = null;
-let deferredPrompt = null;
 let discoverLoaded = false;
 let isDemoMode = false;
+let customerOrdersEnabled = true;
 
 // --- Helpers ---
 function escapeHtml(value = '') {
@@ -241,6 +237,56 @@ function resetUI() {
   paymentPollingInterval = null;
   currentPaymentId = null;
   goToStep(1);
+}
+
+async function loadPublicConfig() {
+  try {
+    const res = await fetch('/api/public/config', { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error('Configuração indisponível');
+
+    const options = Array.from(document.querySelectorAll('.package-option'));
+    const packages = Array.isArray(data.packages) ? data.packages.slice(0, 2) : [];
+
+    packages.forEach((pkg, index) => {
+      const option = options[index];
+      if (!option) return;
+      const radio = option.querySelector('input[name="package"]');
+      const title = option.querySelector('strong');
+      const price = option.querySelector('.package-price');
+      if (!radio || !title || !price) return;
+
+      const limit = Math.max(1, Number(pkg.limit) || (index === 0 ? 3 : 5));
+      const value = Math.max(0, Number(pkg.price) || 0);
+      radio.value = String(limit);
+      radio.dataset.limit = String(limit);
+      radio.dataset.price = value.toFixed(2);
+      title.textContent = `${limit} música${limit === 1 ? '' : 's'}`;
+      price.innerHTML = isDemoMode
+        ? 'GRÁTIS'
+        : `<span>R$</span> ${value.toFixed(2).replace('.', ',')}`;
+    });
+
+    MESSAGE_COST = Math.max(0, Number(data.messageCost) || 0);
+    customerOrdersEnabled = data.ordersEnabled !== false;
+    ordersPausedBanner?.classList.toggle('hidden', customerOrdersEnabled);
+
+    if (modalBtnYes) {
+      modalBtnYes.textContent = isDemoMode || MESSAGE_COST === 0
+        ? 'Adicionar mensagem grátis'
+        : `Adicionar mensagem (+ R$ ${MESSAGE_COST.toFixed(2).replace('.', ',')})`;
+    }
+    if ($('modalQuestion')) {
+      $('modalQuestion').textContent = isDemoMode || MESSAGE_COST === 0
+        ? 'Sua mensagem aparece na TV antes da música sem custo adicional.'
+        : `Por mais R$ ${MESSAGE_COST.toFixed(2).replace('.', ',')}, sua mensagem aparece na TV antes da música.`;
+    }
+
+    if (toStep2Btn) toStep2Btn.disabled = !customerOrdersEnabled;
+    updateSelectedPackage();
+  } catch (error) {
+    console.warn('[Config] Não foi possível atualizar pacotes:', error.message);
+  }
 }
 
 async function loadDemoMode() {
@@ -581,7 +627,10 @@ document.addEventListener('click', (event) => {
 });
 
 packageRadios.forEach(radio => radio.addEventListener('change', updateSelectedPackage));
-toStep2Btn?.addEventListener('click', () => goToStep(2));
+toStep2Btn?.addEventListener('click', () => {
+  if (!customerOrdersEnabled) return showToast('Os pedidos estão temporariamente pausados pelo estabelecimento.', 'info');
+  goToStep(2);
+});
 backToStep1Btn?.addEventListener('click', () => goToStep(1));
 toStep3Btn?.addEventListener('click', () => {
   if (selectedVideos.length !== selectedPackage.limit) return;
@@ -602,6 +651,7 @@ navDiscover?.addEventListener('click', event => {
   event.preventDefault();
   showHome();
   setNavActive(navDiscover);
+  if (!customerOrdersEnabled) return showToast('Os pedidos estão temporariamente pausados pelo estabelecimento.', 'info');
   goToStep(2);
 });
 navUser?.addEventListener('click', event => {
@@ -642,7 +692,9 @@ pagarBtn?.addEventListener('click', () => {
   if ($('modalTitle')) $('modalTitle').textContent = 'Quer deixar uma mensagem?';
   if ($('modalQuestion')) $('modalQuestion').textContent = isDemoMode
     ? 'No modo demo, a mensagem também é grátis e aparece na TV antes da música.'
-    : 'Por mais R$ 1,00, sua mensagem aparece na TV antes da música.';
+    : (MESSAGE_COST === 0
+        ? 'Sua mensagem aparece na TV antes da música sem custo adicional.'
+        : `Por mais R$ ${MESSAGE_COST.toFixed(2).replace('.', ',')}, sua mensagem aparece na TV antes da música.`);
   finalMessage = null;
   finalAmount = selectedPackage.price;
   finalDescription = selectedPackage.description;
@@ -713,41 +765,12 @@ socket.on('updatePlayerState', state => {
 });
 socket.on('paymentConfirmed', handlePaymentConfirmedUI);
 
-// --- PWA: convite discreto, não fica fixo após instalação ---
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-function hideInstallInvite() { installInvite?.classList.add('hidden'); }
-
-window.addEventListener('beforeinstallprompt', event => {
-  event.preventDefault();
-  deferredPrompt = event;
-  if (!isStandalone() && !sessionStorage.getItem('playbar-install-dismissed')) {
-    setTimeout(() => installInvite?.classList.remove('hidden'), 650);
-  }
-});
-
-installBtn?.addEventListener('click', async () => {
-  if (!deferredPrompt) return hideInstallInvite();
-  deferredPrompt.prompt();
-  const choice = await deferredPrompt.userChoice;
-  if (choice?.outcome !== 'accepted') sessionStorage.setItem('playbar-install-dismissed', '1');
-  deferredPrompt = null;
-  hideInstallInvite();
-});
-dismissInstall?.addEventListener('click', () => {
-  sessionStorage.setItem('playbar-install-dismissed', '1');
-  hideInstallInvite();
-});
-window.addEventListener('appinstalled', () => {
-  deferredPrompt = null;
-  hideInstallInvite();
-  localStorage.setItem('playbar-installed', '1');
-});
-if (isStandalone()) hideInstallInvite();
-
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadPublicConfig();
   updateSelectedPackage();
   goToStep(1, { scroll: false });
   loadDiscover();
   loadDemoMode();
   setInterval(loadDemoMode, 15000);
+  setInterval(loadPublicConfig, 30000);
 });
