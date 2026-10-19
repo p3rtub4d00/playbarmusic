@@ -303,6 +303,12 @@ async function loadDemoMode() {
 function applyDemoUi() {
   demoCenter?.classList.toggle('hidden', !isDemoMode);
 
+  if (modalBtnYes) {
+    modalBtnYes.textContent = isDemoMode || MESSAGE_COST === 0
+      ? 'Adicionar mensagem grátis'
+      : `Adicionar mensagem (+ R$ ${MESSAGE_COST.toFixed(2).replace('.', ',')})`;
+  }
+
   const heroCopy = document.querySelector('.hero p');
   if (heroCopy) heroCopy.textContent = isDemoMode
     ? 'Demonstre o PlayBar completo sem cobrança. Escolha músicas, acompanhe no telão e controle tudo pelo painel ADM.'
