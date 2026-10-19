@@ -204,7 +204,8 @@ app.get('/api/status', async (req, res) => {
 });
 
 function getCommissionPercent(masterData) {
-  // Agora espera dados de `check-license` (client)
+  if (masterData?.demo === true || masterData?.client?.demoMode === true) return null;
+
   const percent = Number(masterData?.client?.value);
   const isPercentage = masterData?.client?.model?.includes('%') || masterData?.client?.model?.toLowerCase().includes('porcentagem');
 
@@ -623,18 +624,93 @@ app.get("/search", async (req, res) => {
 app.post("/create-payment", async (req, res) => {
   try {
     const { videos, amount, description, message, socketId, userPhone } = req.body;
-    if (!videos || !amount || !socketId) return res.status(400).json({ ok: false, error: "Dados inválidos." });
-
-    for (const v of videos) {
-        if (await isTitleBlocked(v.title)) {
-            return res.status(400).json({ ok: false, error: `A música "${v.title}" não é permitida pelo estabelecimento.` });
-        }
+    if (!Array.isArray(videos) || videos.length === 0 || !socketId) {
+      return res.status(400).json({ ok: false, error: "Dados inválidos." });
     }
 
-    const notification_url = `https://${req.get('host')}/webhook`; 
+    for (const v of videos) {
+      if (await isTitleBlocked(v.title)) {
+        return res.status(400).json({ ok: false, error: `A música "${v.title}" não é permitida pelo estabelecimento.` });
+      }
+    }
+
+    let demoMode = false;
+    if (MASTER_URL && CLIENT_ID) {
+      try {
+        const licenseResponse = await fetch(`${MASTER_URL}/api/check-license?client_id=${CLIENT_ID}`);
+        if (licenseResponse.ok) {
+          const licenseData = await licenseResponse.json();
+          demoMode = licenseData?.demo === true || licenseData?.client?.demoMode === true;
+        }
+      } catch (licenseError) {
+        console.error('[Demo] Não foi possível consultar o QG Mestre:', licenseError.message);
+      }
+    }
+
+    if (demoMode) {
+      const demoPaymentId = `demo-${Date.now()}-${randomBytes(4).toString('hex')}`;
+
+      const demoPayment = await PaymentModel.create({
+        mpPaymentId: demoPaymentId,
+        socketId,
+        userPhone,
+        amount: 0,
+        description: `[DEMO] ${description || 'Pedido PlayBar'}`,
+        message,
+        status: 'approved',
+        videos
+      });
+
+      isCustomerPlaying = true;
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+
+      const customerVideos = [];
+      for (const v of demoPayment.videos) {
+        if (!(await isTitleBlocked(v.title))) {
+          customerVideos.push({
+            videoId: v.id,
+            title: v.title,
+            isCustomer: true,
+            message: demoPayment.message,
+            userPhone: demoPayment.userPhone || null,
+            mpPaymentId: demoPayment.mpPaymentId,
+            priority: 1
+          });
+        }
+      }
+
+      if (customerVideos.length > 0) {
+        await QueueModel.insertMany(customerVideos);
+        io.emit('player:newOrderNotification', { title: customerVideos[0].title });
+      }
+
+      if (nowPlayingInfo && !nowPlayingInfo.isCustomer) {
+        playNextInQueue();
+      } else if (!nowPlayingInfo) {
+        playNextInQueue();
+      } else {
+        broadcastPlayerState();
+      }
+
+      console.log(`[DEMO] Pedido ${demoPaymentId} liberado sem cobrança.`);
+      return res.json({
+        ok: true,
+        demo: true,
+        paymentId: demoPaymentId,
+        status: 'approved'
+      });
+    }
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ ok: false, error: "Valor de pagamento inválido." });
+    }
+
+    const notification_url = `https://${req.get('host')}/webhook`;
 
     const payment_data = {
-      transaction_amount: Number(amount),
+      transaction_amount: numericAmount,
       description: description,
       payment_method_id: "pix",
       payer: { email: "pagador@email.com" },
@@ -649,10 +725,10 @@ app.post("/create-payment", async (req, res) => {
     }
 
     await PaymentModel.create({
-      mpPaymentId: result.id.toString(), 
+      mpPaymentId: result.id.toString(),
       socketId: socketId,
       userPhone: userPhone,
-      amount: Number(amount),
+      amount: numericAmount,
       description: description,
       message: message,
       status: 'pending',
@@ -661,6 +737,7 @@ app.post("/create-payment", async (req, res) => {
 
     res.json({
       ok: true,
+      demo: false,
       paymentId: result.id.toString(),
       qr: result.point_of_interaction.transaction_data.qr_code_base64,
       copiaCola: result.point_of_interaction.transaction_data.qr_code
