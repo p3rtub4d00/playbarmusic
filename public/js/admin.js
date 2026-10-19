@@ -577,7 +577,9 @@ socket.on('admin:playHistory', (history) => {
       badge.classList.add('is-connected');
       badge.textContent = 'Conectado';
       title.textContent = 'Conta Mercado Pago conectada';
-      textEl.textContent = 'Os próximos PIX serão gerados diretamente na conta autorizada pelo estabelecimento.';
+      textEl.textContent = data.webhookConfigured
+        ? 'Os próximos PIX serão gerados diretamente na conta autorizada. Webhook seguro está ativo.'
+        : 'Conta conectada. Os PIX já funcionam; configure a chave secreta do Webhook do Mercado Pago para validar as notificações em tempo real.';
       if (data.userId) {
         accountInfo.textContent = `Conta Mercado Pago ID: ${data.userId}`;
         accountInfo.style.display = 'block';
