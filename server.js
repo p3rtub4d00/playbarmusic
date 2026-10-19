@@ -31,7 +31,6 @@ const MP_REDIRECT_URI = String(process.env.MERCADOPAGO_REDIRECT_URI || process.e
 const MP_TOKEN_SECRET = String(
   process.env.MERCADOPAGO_TOKEN_ENCRYPTION_KEY ||
   process.env.MP_TOKEN_SECRET ||
-  MP_CLIENT_SECRET ||
   ''
 ).trim();
 const MP_WEBHOOK_SECRET = String(process.env.MERCADOPAGO_WEBHOOK_SECRET || '').trim();
